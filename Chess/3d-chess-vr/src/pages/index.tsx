@@ -1,10 +1,11 @@
-import dynamic from 'next/dynamic'
+import type { ReactElement } from 'react'
+import { AppMount } from '../scaffold/AppMount'
 
-const ClientHall = dynamic(() => import('@/ui/ClientHall').then((mod) => mod.ClientHall), {
-  ssr: false,
-  loading: () => <div className="booting">Opening the hall…</div>,
-})
-
-export default function Home() {
-  return <ClientHall />
+/**
+ * Next.js page. Delegates to {@link AppMount} and owns no game state.
+ *
+ * @returns The foundation mount point.
+ */
+export default function Home(): ReactElement {
+  return <AppMount />
 }
