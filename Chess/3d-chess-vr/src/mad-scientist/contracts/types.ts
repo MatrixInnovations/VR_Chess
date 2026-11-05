@@ -1,9 +1,12 @@
 /**
  * Shared move vocabulary for the Mad Scientist lane.
  *
- * Ultron owns the foundation contracts. These types are a local stand-in until
- * that branch is merged. They describe human moves only — this lane never asks
- * a chess engine for a suggestion (Lichess ToS).
+ * Ultron owns the foundation contracts (PR #5, `src/ultron`). That branch is not
+ * mergeable here yet (`package.json` conflicts), so this folder stays until the
+ * rebase. Delete `src/mad-scientist/contracts` and `session/GameSession.ts` then
+ * and import the Ultron types. `voice` is already on {@link MoveSource} so a
+ * Sundae intent is not a type error. This lane never asks a chess engine for a
+ * suggestion (Lichess ToS).
  */
 
 /** File `0` is the a-file. Rank `0` is the far rank in the existing 2D board (y = 0). */
@@ -26,7 +29,8 @@ export type PieceColor = 'white' | 'black'
 /** Visual finish only. It does not change whose turn it is. */
 export type PieceFinish = 'idle' | 'selected' | 'dragging'
 
-export type MoveSource = 'pointer' | 'xr-controller' | 'hand'
+/** Pointer, Touch controller, bare hand, or Sundae voice. Matches Ultron's `MoveSource`. */
+export type MoveSource = 'pointer' | 'xr-controller' | 'hand' | 'voice'
 
 export type PromotionPiece = 'queen' | 'rook' | 'bishop' | 'knight'
 

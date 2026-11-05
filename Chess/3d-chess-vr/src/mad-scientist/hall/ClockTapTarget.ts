@@ -18,8 +18,13 @@ export class ClockTapTarget {
 
   private readonly material: MeshStandardMaterial
 
-  constructor(position: Vec3) {
-    this.geometry = new BoxGeometry(0.08, 0.05, 0.04)
+  /**
+   * @param position - Center of the volume, in meters.
+   * @param size - Box size in meters. The default matches the original placeholder.
+   * A physical clock passes a larger box so a press on either face still hits.
+   */
+  constructor(position: Vec3, size: Vec3 = { x: 0.08, y: 0.05, z: 0.04 }) {
+    this.geometry = new BoxGeometry(size.x, size.y, size.z)
     this.material = new MeshStandardMaterial({
       color: 0x20242b,
       roughness: 0.4,

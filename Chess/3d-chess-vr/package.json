@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
+    "test:xr": "vitest run src/mad-scientist/__tests__/XrInputHarness.test.ts",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
     "eslint-plugin-react": "^7.31.11",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-unused-imports": "^2.0.0",
+    "iwer": "2.8.0",
     "prettier": "^2.8.1",
     "vite": "6",
     "vitest": "^5.1.0"
