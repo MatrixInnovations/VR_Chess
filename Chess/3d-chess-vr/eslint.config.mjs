@@ -7,6 +7,8 @@ import tseslint from 'typescript-eslint'
  * TSDoc syntax is required, and exported classes, interfaces, and public
  * methods must have a doc comment.
  */
+const source = 'src/**/*.{ts,tsx}'
+
 export default tseslint.config(
   {
     ignores: [
@@ -15,12 +17,17 @@ export default tseslint.config(
       'coverage/**',
       'public/**',
       'next-env.d.ts',
+      '**/*.js',
+      '**/*.mjs',
     ],
   },
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: [source],
+  })),
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: [source],
     ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-    extends: [tseslint.configs.recommended],
     plugins: {
       tsdoc,
       jsdoc,
