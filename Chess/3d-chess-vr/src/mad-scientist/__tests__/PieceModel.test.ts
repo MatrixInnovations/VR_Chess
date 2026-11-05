@@ -3,6 +3,7 @@ import { Group } from 'three'
 
 import type { PieceKind } from '../contracts/types'
 import { BoardModel } from '../hall/BoardModel'
+import { PerformanceBudget } from '../hall/PerformanceBudget'
 import { PieceMaterialSet } from '../hall/PieceMaterialSet'
 import { PieceModel } from '../hall/PieceModel'
 import { whitePawn } from './helpers'
@@ -23,6 +24,39 @@ describe('PieceMaterialSet', () => {
     expect(white.emissiveIntensity).toBe(0)
     expect(dragging.transparent).toBe(true)
     expect(dragging.opacity).toBeLessThan(1)
+  })
+
+  it('uses felt and wood board finishes and keeps the Quest material budget honest', () => {
+    const set = new PieceMaterialSet()
+    const felt = set.boardSquare('light')
+    const wood = set.boardSquare('dark')
+    const white = set.get('white', 'idle')
+    const black = set.get('black', 'idle')
+    const budget = set.gpuBudget()
+
+    expect(felt).not.toBe(wood)
+    expect(felt.color.getHex()).toBeGreaterThan(wood.color.getHex())
+    expect(felt.roughness).toBeGreaterThan(0.85)
+    expect(wood.roughness).toBeGreaterThan(0.4)
+    expect(wood.roughness).toBeLessThan(0.8)
+    expect(white.roughness).not.toBeCloseTo(black.roughness, 1)
+    expect(Math.abs(white.roughness - black.roughness)).toBeGreaterThan(0.15)
+    expect(white.metalness).toBeLessThan(0.2)
+    expect(black.metalness).toBeLessThan(0.25)
+    expect(budget.textureCount).toBe(0)
+    felt.map = {} as typeof felt.map
+    expect(set.gpuBudget().textureCount).toBe(1)
+    felt.map = null
+    expect(set.gpuBudget().textureCount).toBe(0)
+    expect(budget.materialCount).toBeLessThanOrEqual(16)
+    expect(budget.materialCount).toBeGreaterThan(6)
+    expect(PerformanceBudget.QUEST_PRO_FLOOR_FPS).toBe(72)
+    expect(PerformanceBudget.QUEST_PRO_TARGET_FPS).toBe(90)
+    for (const material of [felt, wood, white, black, set.boardFrame(), set.highlightMaterial()]) {
+      expect(material.map).toBeNull()
+      expect(material.normalMap).toBeNull()
+      expect(material.roughnessMap).toBeNull()
+    }
   })
 })
 

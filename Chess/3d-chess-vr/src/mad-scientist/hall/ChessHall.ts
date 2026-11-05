@@ -59,15 +59,13 @@ export class ChessHall {
 
   private readonly geometries: BoxGeometry[] = []
 
-  private readonly ownedMaterials: MeshStandardMaterial[] = []
-
   private readonly ownsMaterials: boolean
 
   constructor(options: ChessHallOptions = {}) {
     this.root.name = 'chess-hall'
     this.ownsMaterials = options.materials === undefined
     this.materials = options.materials ?? new PieceMaterialSet()
-    this.board = new BoardModel()
+    this.board = new BoardModel(this.materials)
     this.lighting = new HallLighting()
     this.clockTap = new ClockTapTarget({ x: 0.42, y: TABLE_TOP_Y + 0.03, z: 0.05 })
     this.camera = new PerspectiveCamera(50, 1, 0.05, 20)
@@ -107,7 +105,6 @@ export class ChessHall {
     this.clockTap.dispose()
     if (this.ownsMaterials) this.materials.dispose()
     for (const geometry of this.geometries) geometry.dispose()
-    for (const material of this.ownedMaterials) material.dispose()
     this.root.clear()
   }
 
@@ -130,7 +127,7 @@ export class ChessHall {
       'floor',
       { x: 6, y: 0.04, z: 6 },
       { x: 0, y: 0.02, z: 0 },
-      0x6a503c,
+      this.materials.floorWood(),
       room,
       true,
     )
@@ -138,7 +135,7 @@ export class ChessHall {
       'ceiling',
       { x: 6, y: 0.08, z: 6 },
       { x: 0, y: 3, z: 0 },
-      0xefeae2,
+      this.materials.plaster(),
       room,
       false,
     )
@@ -149,7 +146,7 @@ export class ChessHall {
       { name: 'wall-west', size: { x: 0.08, y: 3, z: 6 }, position: { x: -3, y: 1.5, z: 0 } },
     ]
     for (const wall of walls) {
-      this.addBox(wall.name, wall.size, wall.position, 0xd9d1c5, room, false)
+      this.addBox(wall.name, wall.size, wall.position, this.materials.plaster(), room, false)
     }
 
     const tableTop = TABLE_TOP_Y
@@ -157,8 +154,9 @@ export class ChessHall {
       'table',
       { x: 1.3, y: 0.04, z: 0.9 },
       { x: 0, y: tableTop - 0.02, z: 0 },
-      0x4a2f1b,
+      this.materials.boardFrame(),
       room,
+      true,
       true,
     )
     const underside = tableTop - 0.04
@@ -175,31 +173,92 @@ export class ChessHall {
         `table-leg-${index}`,
         { x: 0.06, y: legHeight, z: 0.06 },
         { x: leg.x, y: legY, z: leg.z },
-        0x3b2416,
+        this.materials.trimWood(),
         room,
         false,
       )
     })
+    this.buildDetail(room)
     this.root.add(room)
+  }
+
+  /**
+   * Rug, baseboard, window, and two seats.
+   * Boxes only, and none of them cast shadows. The key light is still the
+   * only shadow caster, which is what keeps the hall in the 72–90fps band.
+   */
+  private buildDetail(room: Group): void {
+    this.addBox(
+      'rug',
+      { x: 1.7, y: 0.01, z: 1.2 },
+      { x: 0, y: 0.055, z: 0 },
+      this.materials.rugFelt(),
+      room,
+      true,
+    )
+    const baseboards: Array<{ name: string; size: Vec3; position: Vec3 }> = [
+      { name: 'baseboard-north', size: { x: 5.7, y: 0.1, z: 0.04 }, position: { x: 0, y: 0.09, z: -2.88 } },
+      { name: 'baseboard-south', size: { x: 5.7, y: 0.1, z: 0.04 }, position: { x: 0, y: 0.09, z: 2.88 } },
+      { name: 'baseboard-east', size: { x: 0.04, y: 0.1, z: 5.7 }, position: { x: 2.88, y: 0.09, z: 0 } },
+      { name: 'baseboard-west', size: { x: 0.04, y: 0.1, z: 5.7 }, position: { x: -2.88, y: 0.09, z: 0 } },
+    ]
+    for (const board of baseboards) {
+      this.addBox(board.name, board.size, board.position, this.materials.trimWood(), room, false)
+    }
+
+    const windowFrame = new Group()
+    windowFrame.name = 'window-frame'
+    room.add(windowFrame)
+    this.addBox(
+      'window-trim',
+      { x: 1.4, y: 0.9, z: 0.04 },
+      { x: 0, y: 1.7, z: -2.9 },
+      this.materials.trimWood(),
+      windowFrame,
+      false,
+    )
+    this.addBox(
+      'window-pane',
+      { x: 1.05, y: 0.58, z: 0.02 },
+      { x: 0, y: 1.7, z: -2.87 },
+      this.materials.windowPane(),
+      windowFrame,
+      false,
+    )
+    this.addBox(
+      'seat',
+      { x: 0.48, y: 0.06, z: 0.4 },
+      { x: 0, y: 0.48, z: 0.78 },
+      this.materials.seatCloth(),
+      room,
+      false,
+    )
+    this.addBox(
+      'opponent-seat',
+      { x: 0.48, y: 0.06, z: 0.4 },
+      { x: 0, y: 0.48, z: -0.78 },
+      this.materials.seatCloth(),
+      room,
+      false,
+    )
   }
 
   private addBox(
     name: string,
     size: Vec3,
     position: Vec3,
-    color: number,
+    material: MeshStandardMaterial,
     parent: Object3D,
     receiveShadow: boolean,
+    castShadow = false,
   ): void {
     const geometry = new BoxGeometry(size.x, size.y, size.z)
-    const material = new MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.04 })
     const mesh = new Mesh(geometry, material)
     mesh.name = name
     mesh.position.set(position.x, position.y, position.z)
     mesh.receiveShadow = receiveShadow
-    mesh.castShadow = name === 'table'
+    mesh.castShadow = castShadow
     parent.add(mesh)
     this.geometries.push(geometry)
-    this.ownedMaterials.push(material)
   }
 }

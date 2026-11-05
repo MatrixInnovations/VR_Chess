@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PerspectiveCamera, Vector3 } from 'three'
+import { Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from 'three'
 
 import { ClockTapTarget } from '../hall/ClockTapTarget'
 import { ChessHall } from '../hall/ChessHall'
@@ -104,6 +104,43 @@ describe('ChessHall', () => {
     expect(hall.board.squareFromWorld(clock)).toBeNull()
     expect(hall.getPiece('missing')).toBeUndefined()
     expect(hall.getPieces()).toEqual([])
+  })
+
+  it('adds room detail with shared untextured materials and the same three lights', () => {
+    const hall = new ChessHall()
+    for (const name of ['rug', 'baseboard-north', 'window-frame', 'seat', 'opponent-seat']) {
+      expect(hall.root.getObjectByName(name), name).toBeTruthy()
+    }
+    expect(hall.lighting.lights()).toHaveLength(3)
+    expect(hall.lighting.lights().filter((light) => light.castShadow)).toHaveLength(1)
+
+    for (const name of ['rug', 'baseboard-north', 'seat', 'opponent-seat']) {
+      const mesh = hall.root.getObjectByName(name) as Mesh
+      expect(mesh.castShadow, name).toBe(false)
+    }
+    const windowFrame = hall.root.getObjectByName('window-frame')
+    windowFrame?.traverse((obj) => {
+      const mesh = obj as Mesh
+      if (mesh.isMesh) expect(mesh.castShadow).toBe(false)
+    })
+
+    const materials = new Set<MeshStandardMaterial>()
+    let meshes = 0
+    hall.root.traverse((obj) => {
+      const mesh = obj as Mesh
+      if (!mesh.isMesh) return
+      meshes += 1
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const material of list) {
+        const standard = material as MeshStandardMaterial
+        materials.add(standard)
+        expect(standard.map ?? null).toBeNull()
+        expect(standard.normalMap ?? null).toBeNull()
+      }
+    })
+    expect(meshes).toBeLessThan(120)
+    expect(materials.size).toBeLessThanOrEqual(20)
+    hall.dispose()
   })
 
   it('places pieces on their squares and swaps materials through the shared set', () => {

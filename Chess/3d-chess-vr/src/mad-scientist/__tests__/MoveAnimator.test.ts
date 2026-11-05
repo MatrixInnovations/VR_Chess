@@ -110,4 +110,81 @@ describe('MoveAnimator', () => {
     animator.cancel()
     expect(animator.isAnimating()).toBe(false)
   })
+
+  it('capture, castling, and promotion hooks do not move pieces or submit', () => {
+    const { model, animator, submit, board } = stage()
+    const home = model.object.position.clone()
+    const square = model.getSquare()
+
+    animator.notifyCapture({
+      attackerId: model.id,
+      capturedId: 'black-pawn-1',
+      square: { file: 4, rank: 4 },
+    })
+    animator.notifyCastling({
+      kingId: 'white-king',
+      rookId: 'white-rook-1',
+      kingFrom: { file: 4, rank: 7 },
+      kingTo: { file: 6, rank: 7 },
+      rookFrom: { file: 7, rank: 7 },
+      rookTo: { file: 5, rank: 7 },
+    })
+    animator.notifyPromotion({
+      pieceId: model.id,
+      square,
+      promoteTo: 'queen',
+    })
+
+    expect(model.kind).toBe('pawn')
+    expect(model.getSquare()).toEqual(square)
+    expect(model.object.position.x).toBeCloseTo(home.x)
+    expect(model.object.position.y).toBeCloseTo(home.y)
+    expect(model.object.position.z).toBeCloseTo(home.z)
+    expect(submit).not.toHaveBeenCalled()
+    expect(board.squareMesh(square)?.position.x).toBeCloseTo(board.worldPosition(square).x)
+  })
+
+  it('forwards visual events once and does not cancel an in-flight slide', () => {
+    const { model, clock, board } = stage()
+    const visuals = {
+      onCapture: vi.fn(),
+      onCastling: vi.fn(),
+      onPromotion: vi.fn(),
+    }
+    const animator = new MoveAnimator(board, clock, visuals)
+    animator.animate(model, { file: 4, rank: 4 }, 1000)
+    const capture = {
+      attackerId: model.id,
+      capturedId: 'black-knight-1',
+      square: { file: 4, rank: 4 },
+    }
+    animator.notifyCapture(capture)
+    expect(visuals.onCapture).toHaveBeenCalledTimes(1)
+    expect(visuals.onCapture).toHaveBeenCalledWith(capture)
+    expect(visuals.onCastling).not.toHaveBeenCalled()
+    expect(animator.isAnimating(model.id)).toBe(true)
+
+    const castling = {
+      kingId: 'white-king',
+      rookId: 'white-rook-1',
+      kingFrom: { file: 4, rank: 7 },
+      kingTo: { file: 2, rank: 7 },
+      rookFrom: { file: 0, rank: 7 },
+      rookTo: { file: 3, rank: 7 },
+    }
+    animator.notifyCastling(castling)
+    expect(visuals.onCastling).toHaveBeenCalledTimes(1)
+    expect(visuals.onCastling).toHaveBeenCalledWith(castling)
+
+    const promotion = {
+      pieceId: model.id,
+      square: { file: 4, rank: 4 },
+      promoteTo: 'rook' as const,
+    }
+    animator.notifyPromotion(promotion)
+    expect(visuals.onPromotion).toHaveBeenCalledTimes(1)
+    expect(visuals.onPromotion).toHaveBeenCalledWith(promotion)
+    expect(model.kind).toBe('pawn')
+    expect(animator.isAnimating(model.id)).toBe(true)
+  })
 })

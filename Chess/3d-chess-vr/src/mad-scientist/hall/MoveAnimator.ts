@@ -2,6 +2,8 @@ import type { Square } from '../contracts/types'
 import type { BoardModel } from './BoardModel'
 import { MOVE_ARC_LIFT_M } from './metrics'
 import type { PieceModel } from './PieceModel'
+import type { CaptureVisual, CastlingVisual, IMoveVisuals, PromotionVisual } from './MoveVisuals'
+import { NoOpMoveVisuals } from './MoveVisuals'
 
 /** Clock used to sample animation time. Tests pass a manual one. */
 export interface IClock {
@@ -29,11 +31,40 @@ interface ActiveMove {
  * The arc is visual. Completion does not submit a move and does not edit the
  * session. {@link cancel} puts the mesh back on the square it left so a
  * mid-air piece cannot stay stuck after tracking loss.
+ *
+ * Capture, castling, and promotion are forwarded to {@link IMoveVisuals}.
+ * The default listener is a no-op so these hooks do not invent animations
+ * or chess rules. Ultron replaces the listener when GameSession emits them.
  */
 export class MoveAnimator {
   private readonly active = new Map<string, ActiveMove>()
 
-  constructor(private readonly board: BoardModel, private readonly clock: IClock) {}
+  constructor(
+    private readonly board: BoardModel,
+    private readonly clock: IClock,
+    private readonly visuals: IMoveVisuals = new NoOpMoveVisuals(),
+  ) {}
+
+  /**
+   * Hear a capture. Does not move either piece and does not submit.
+   */
+  notifyCapture(event: CaptureVisual): void {
+    this.visuals.onCapture(event)
+  }
+
+  /**
+   * Hear a castle. Does not slide the king or the rook by itself.
+   */
+  notifyCastling(event: CastlingVisual): void {
+    this.visuals.onCastling(event)
+  }
+
+  /**
+   * Hear a promotion. Does not change the piece mesh.
+   */
+  notifyPromotion(event: PromotionVisual): void {
+    this.visuals.onPromotion(event)
+  }
 
   /**
    * Start (or restart) the slide for `piece`.

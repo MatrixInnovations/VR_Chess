@@ -19,6 +19,9 @@ describe('BoardModel', () => {
     const lightHex = (light.material as MeshStandardMaterial).color.getHex()
     const darkHex = (dark.material as MeshStandardMaterial).color.getHex()
     expect(lightHex).toBeGreaterThan(darkHex)
+    expect(light.material).toBe(board.squareMesh({ file: 1, rank: 1 })?.material)
+    expect(dark.material).toBe(board.squareMesh({ file: 0, rank: 1 })?.material)
+    expect(light.material).not.toBe(dark.material)
   })
 
   it('highlights legal squares and restores the original material', () => {

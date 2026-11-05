@@ -3,6 +3,7 @@ import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
 import { isOnBoard, squareKey } from '../contracts/squares'
 import type { Square } from '../contracts/types'
 import { BOARD_SURFACE_Y, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
+import { PieceMaterialSet } from './PieceMaterialSet'
 
 /**
  * World position of a square's top-center, in meters.
@@ -19,8 +20,9 @@ export function squareCenter(square: Square): { x: number; y: number; z: number 
 
 /**
  * The physical board: 64 squares plus a frame.
- * Highlights are a material swap. They are not a move, and this class
- * has no method that changes whose piece sits on a square.
+ * Light and dark squares share two materials from {@link PieceMaterialSet}
+ * (felt and walnut). Highlights are a material swap, not a new shader.
+ * This class has no method that changes whose piece sits on a square.
  */
 export class BoardModel {
   /** Root group. Parent it under the hall table. */
@@ -36,18 +38,15 @@ export class BoardModel {
 
   private readonly geometries: BoxGeometry[] = []
 
-  private readonly ownedMaterials: MeshStandardMaterial[] = []
+  private readonly materials: PieceMaterialSet
 
-  constructor() {
+  private readonly ownsMaterials: boolean
+
+  constructor(materials?: PieceMaterialSet) {
     this.object.name = 'board'
-    this.highlightMaterial = new MeshStandardMaterial({
-      color: 0xc9a227,
-      emissive: 0xc9a227,
-      emissiveIntensity: 0.45,
-      roughness: 0.45,
-      metalness: 0.1,
-    })
-    this.ownedMaterials.push(this.highlightMaterial)
+    this.ownsMaterials = materials === undefined
+    this.materials = materials ?? new PieceMaterialSet()
+    this.highlightMaterial = this.materials.highlightMaterial()
     this.buildFrame()
     this.buildSquares()
   }
@@ -112,11 +111,13 @@ export class BoardModel {
     return this.squares.get(squareKey(square))
   }
 
-  /** Release geometries and materials owned by the board. */
+  /**
+   * Release square geometries.
+   * Shared materials are disposed only when this board created the set.
+   */
   dispose(): void {
     for (const geometry of this.geometries) geometry.dispose()
-    for (const material of this.ownedMaterials) material.dispose()
-    for (const material of this.baseMaterials.values()) material.dispose()
+    if (this.ownsMaterials) this.materials.dispose()
     this.object.clear()
     this.squares.clear()
     this.highlighted.clear()
@@ -128,18 +129,13 @@ export class BoardModel {
       0.008,
       SQUARE_SIZE_M * 8 + 0.02,
     )
-    const material = new MeshStandardMaterial({
-      color: 0x3a2415,
-      roughness: 0.6,
-      metalness: 0.05,
-    })
+    const material = this.materials.boardFrame()
     const frame = new Mesh(geometry, material)
     frame.name = 'board-frame'
     frame.position.y = BOARD_SURFACE_Y - SQUARE_THICKNESS_M - 0.004
     frame.receiveShadow = true
     this.object.add(frame)
     this.geometries.push(geometry)
-    this.ownedMaterials.push(material)
   }
 
   private buildSquares(): void {
@@ -148,11 +144,7 @@ export class BoardModel {
         const square = { file, rank }
         // a8 (file 0, rank 0 in this board's index) is a light square, matching the existing board.
         const light = (file + rank) % 2 === 0
-        const material = new MeshStandardMaterial({
-          color: light ? 0xe8d7b0 : 0x6b4a2f,
-          roughness: 0.55,
-          metalness: 0.04,
-        })
+        const material = this.materials.boardSquare(light ? 'light' : 'dark')
         const geometry = new BoxGeometry(
           SQUARE_SIZE_M * 0.96,
           SQUARE_THICKNESS_M,

@@ -5,6 +5,7 @@ export { PieceMaterialSet } from './hall/PieceMaterialSet'
 export { HallLighting } from './hall/HallLighting'
 export { ClockTapTarget } from './hall/ClockTapTarget'
 export { MoveAnimator } from './hall/MoveAnimator'
+export { NoOpMoveVisuals } from './hall/MoveVisuals'
 export { PerformanceBudget } from './hall/PerformanceBudget'
 export { PointerDragInput } from './input/PointerDragInput'
 export { XRControllerInput } from './input/XRControllerInput'
@@ -15,9 +16,12 @@ export { IntentIdSequence } from './input/IntentIdSequence'
 export { GameSession } from './session/GameSession'
 export { HallRuntime } from './runtime/HallRuntime'
 export { ChessHallView } from './react/ChessHallView'
+export { HallDemo, demoLineup, hallDemoMount } from './react/HallDemo'
+export { HallDemoPage } from './react/HallDemoPage'
 
 export type { IGameSession } from './contracts/IGameSession'
 export type { IInputController } from './contracts/IInputController'
+export type { CaptureVisual, CastlingVisual, IMoveVisuals, PromotionVisual } from './hall/MoveVisuals'
 export type {
   CancelReason,
   MoveIntent,
