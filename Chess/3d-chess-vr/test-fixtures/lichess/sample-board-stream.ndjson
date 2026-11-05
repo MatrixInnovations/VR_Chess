@@ -1,0 +1,2 @@
+{"type":"gameFull","id":"fixtureGame1","initialFen":"startpos","speed":"blitz","clock":{"initial":300000,"increment":0},"state":{"type":"gameState","moves":"","wtime":300000,"btime":300000,"winc":0,"binc":0,"status":"started"}}
+{"type":"gameState","moves":"e2e4","wtime":299000,"btime":300000,"winc":0,"binc":0,"status":"started"}
