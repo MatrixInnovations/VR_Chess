@@ -1,0 +1,10 @@
+{
+  "name": "@vr-chess/fridae-clock",
+  "private": true,
+  "type": "module",
+  "description": "Fridae lane: Lichess and offline chess-clock domain logic. No network and no React view.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/**/*.test.ts",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include=src/**/*.ts --test-coverage-lines=90 --test-coverage-branches=75 --test test/**/*.test.ts"
+  }
+}
