@@ -10,11 +10,17 @@ export type {
   AuthoritativeClockSnapshot,
   ClockEvent,
   ClockExpiration,
+  ClockTapTarget,
   ClockViewSnapshot,
   Color,
   LichessGameStatus,
   MoveIgnoreReason,
 } from "./ChessClock.ts"
+
+export { ChessClockPort } from "./ChessClockPort.ts"
+export type { ClockReading, IClockPort } from "./ChessClockPort.ts"
+
+export { CLOCK_EVENT_TYPES, CLOCK_SNAPSHOT_FIELDS } from "./clockViewContract.ts"
 
 export { LichessClockSynchronizer } from "./LichessClockSynchronizer.ts"
 export type {

@@ -5,6 +5,14 @@ import type { MonotonicTimeSource } from "./MonotonicTimeSource.ts"
 export type Color = "white" | "black"
 
 /**
+ * Physical clock button. Mad Scientist passes this to {@link ChessClock.acceptTap}.
+ * The tap does not change the online turn and does not submit a move.
+ */
+export interface ClockTapTarget {
+  readonly color: Color
+}
+
+/**
  * `status` strings from the Lichess GameStatusName schema.
  * `timeout` means the opponent left. `outoftime` is the clock flag.
  * `noStart` is the first-move abort, not a Fischer flag.
@@ -239,6 +247,7 @@ export class ChessClock {
   private generation = -1
   private lastSignature: string | null = null
   private reconciledThroughPly = -1
+  private held = false
   private disposed = false
 
   private constructor(time: MonotonicTimeSource, mode: "online" | "offline") {
@@ -282,6 +291,36 @@ export class ChessClock {
     clock.speed = control.speed
     clock.phase = "running"
     clock.running = true
+    clock.anchorMs = time.now()
+    return clock
+  }
+
+  /**
+   * Realtime clock with explicit millisecond banks.
+   * Used by {@link ChessClockPort}. This does not re-check challenge-API limits,
+   * because a mid-game server bank is not a new seek.
+   * @param time - Monotonic source.
+   * @param options - Banks, one increment for both sides, and whether it is already running.
+   */
+  static createArmed(
+    time: MonotonicTimeSource,
+    options: {
+      readonly mode: "online" | "offline"
+      readonly whiteMs: number
+      readonly blackMs: number
+      readonly incrementMs: number
+      readonly sideToMove: Color
+    },
+  ): ChessClock {
+    const clock = new ChessClock(time, options.mode)
+    clock.kind = "realtime"
+    clock.whiteMs = options.whiteMs
+    clock.blackMs = options.blackMs
+    clock.whiteIncrementMs = options.incrementMs
+    clock.blackIncrementMs = options.incrementMs
+    clock.active = options.sideToMove
+    clock.running = false
+    clock.phase = "armed"
     clock.anchorMs = time.now()
     return clock
   }
@@ -538,6 +577,91 @@ export class ChessClock {
   notifyTapped(color: Color): void {
     this.assertLive()
     this.emit({ type: "tapIgnored", color })
+  }
+
+  /**
+   * Physical {@link ClockTapTarget}. Same as {@link ChessClock.notifyTapped}.
+   * Online and offline taps leave the side to move unchanged.
+   * @param target - Button the table model reported.
+   */
+  acceptTap(target: ClockTapTarget): void {
+    this.notifyTapped(target.color)
+  }
+
+  /**
+   * Replace both banks from a server or give-time snapshot.
+   * Does not add increment and does not resume a clock that {@link ChessClock.hold} stopped.
+   * A terminal clock, including an offline local flag, ignores the replacement.
+   * @param whiteMs - White remaining milliseconds.
+   * @param blackMs - Black remaining milliseconds.
+   * @param sideToMove - Runner to adopt when the caller knows it. Omitted keeps the current side.
+   */
+  replaceRemaining(whiteMs: number, blackMs: number, sideToMove?: Color): void {
+    this.assertLive()
+    const samples = [whiteMs, blackMs]
+    for (const sample of samples) {
+      if (!Number.isSafeInteger(sample) || sample < 0) return
+    }
+    if (this.terminal) return
+    this.kind = "realtime"
+    this.whiteMs = whiteMs
+    this.blackMs = blackMs
+    if (sideToMove === "white" || sideToMove === "black") this.active = sideToMove
+    if (this.held) return
+    this.running = true
+    this.phase = "running"
+    this.anchorMs = this.time.now()
+    this.clearProvisional()
+    this.observeThreshold()
+  }
+
+  /**
+   * Fold the active bank and stop the countdown.
+   * The instance stays usable. A later server replacement may change the banks
+   * but does not start them again until {@link ChessClock.rearm}.
+   */
+  hold(): void {
+    this.assertLive()
+    if (this.terminal) return
+    if (this.running) {
+      const left = this.readBankMillis(this.active)
+      if (this.active === "white") this.whiteMs = left
+      else this.blackMs = left
+    }
+    this.running = false
+    this.held = true
+    this.phase = "armed"
+  }
+
+  /**
+   * Start or restart a realtime countdown from explicit banks.
+   * @param options - Banks, shared increment, and side to move.
+   */
+  rearm(options: {
+    readonly whiteMs: number
+    readonly blackMs: number
+    readonly incrementMs: number
+    readonly sideToMove: Color
+  }): void {
+    this.assertLive()
+    this.kind = "realtime"
+    this.whiteMs = options.whiteMs
+    this.blackMs = options.blackMs
+    this.whiteIncrementMs = options.incrementMs
+    this.blackIncrementMs = options.incrementMs
+    this.active = options.sideToMove
+    this.running = true
+    this.held = false
+    this.phase = "running"
+    this.terminal = false
+    this.confirmedFlag = null
+    this.provisionalFlagColor = null
+    this.anchorMs = this.time.now()
+    this.appliedRevisions.clear()
+    this.incrementedPlies.clear()
+    this.reconciledThroughPly = -1
+    this.ply = 0
+    this.lichessStatus = null
   }
 
   /**
