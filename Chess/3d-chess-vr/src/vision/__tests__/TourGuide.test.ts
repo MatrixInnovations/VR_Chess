@@ -70,6 +70,8 @@ describe('TourGuide', () => {
     expect(guide.current()).toBeNull()
 
     guide.resume()
+    // welcome -> board -> clock -> completed
+    guide.next()
     guide.next()
     guide.next()
     expect(guide.isFirstRunPending()).toBe(false)
