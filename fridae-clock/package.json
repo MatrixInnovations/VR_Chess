@@ -1,0 +1,15 @@
+{
+  "name": "@vr-chess/fridae-clock",
+  "private": true,
+  "type": "module",
+  "description": "Fridae lane: Lichess and offline chess-clock domain logic. No network and no React view.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:coverage": "node scripts/check-chess-clock-coverage.mjs"
+  },
+  "devDependencies": {
+    "tsx": "4.20.6",
+    "typescript": "5.4.5"
+  }
+}
