@@ -133,6 +133,25 @@ describe('ChessApplication pass and play', () => {
     expect(spoken.app.game).not.toBe(before)
     expect(spoken.app.game.snapshot.moves).toEqual([])
   })
+
+  it('redraws the sign-in screen and the clock when a second passes', () => {
+    let time = 0
+    const { app: hall } = app(() => time)
+    const opened = hall.revision
+    hall.openSignIn()
+    expect(hall.shell.navigator.screen.name).toBe('sign-in')
+    expect(hall.revision).toBeGreaterThan(opened)
+    hall.backToBoard()
+    expect(hall.shell.navigator.screen.name).toBe('board')
+    hall.replayTour()
+    const painted = hall.revision
+    time = 2_500
+    hall.frame(time)
+    expect(hall.revision).toBeGreaterThan(painted)
+    hall.backToLobby()
+    hall.cancelWait()
+    void hall.retryConnection()
+  })
 })
 
 class ScriptFactory implements SpeechRecognitionFactory {

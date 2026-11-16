@@ -19,10 +19,10 @@ export class PhysicalChessClock {
   private readonly body: Mesh
   private readonly whiteFace: Mesh
   private readonly blackFace: Mesh
-  private readonly textures: CanvasTexture[] = []
-  private readonly clones: MeshStandardMaterial[] = []
-  private lastWhite = ''
-  private lastBlack = ''
+  private readonly faces: Record<'white' | 'black', FacePaint> = {
+    white: { signature: '', canvas: null, texture: null, material: null },
+    black: { signature: '', canvas: null, texture: null, material: null },
+  }
 
   /**
    * Creates the instance.
@@ -57,8 +57,10 @@ export class PhysicalChessClock {
     this.body.geometry.dispose()
     this.whiteFace.geometry.dispose()
     this.blackFace.geometry.dispose()
-    for (const texture of this.textures) texture.dispose()
-    for (const material of this.clones) material.dispose()
+    for (const face of [this.faces.white, this.faces.black]) {
+      face.texture?.dispose()
+      face.material?.dispose()
+    }
     this.materials.dispose()
   }
 
@@ -71,47 +73,67 @@ export class PhysicalChessClock {
   }
 
   private paint(mesh: Mesh, face: IClockSideFace, side: 'white' | 'black'): void {
-    const material = this.materials.forExpiry(face.expiry)
-    mesh.material = material
+    const paint = this.faces[side]
+    const signature = `${face.label}|${face.expiry}`
     mesh.userData.clockLabel = face.label
     mesh.userData.clockSide = side
-    const previous = side === 'white' ? this.lastWhite : this.lastBlack
-    if (previous === face.label && mesh.userData.clockPainted === face.label) return
-    if (side === 'white') this.lastWhite = face.label
-    else this.lastBlack = face.label
-    const texture = this.drawLabel(face.label, face.expiry === 'no-clock')
-    if (!texture) return
-    const next = material.clone()
-    next.map = texture
-    next.color.set('#ffffff')
-    this.clones.push(next)
-    mesh.material = next
+    if (paint.signature === signature) return
+    const drawn = this.redraw(paint, face.label, face.expiry === 'no-clock')
+    paint.signature = signature
+    if (!drawn) {
+      mesh.material = this.materials.forExpiry(face.expiry)
+      return
+    }
+    if (!paint.material) {
+      paint.material = this.materials.forExpiry(face.expiry).clone()
+      paint.material.map = paint.texture
+      paint.material.color.set('#ffffff')
+    } else {
+      const source = this.materials.forExpiry(face.expiry)
+      paint.material.color.copy(source.color)
+      paint.material.emissive.copy(source.emissive)
+      paint.material.emissiveIntensity = source.emissiveIntensity
+      paint.material.map = paint.texture
+    }
+    mesh.material = paint.material
     mesh.userData.clockPainted = face.label
-    this.textures.push(texture)
   }
 
-  private drawLabel(label: string, muted: boolean): CanvasTexture | null {
-    if (typeof document === 'undefined') return null
-    const canvas = document.createElement('canvas')
-    canvas.width = 256
-    canvas.height = 128
+  /** Draw into the one canvas this face already owns. */
+  private redraw(paint: FacePaint, label: string, muted: boolean): boolean {
+    if (typeof document === 'undefined') return false
+    if (!paint.canvas) {
+      paint.canvas = document.createElement('canvas')
+      paint.canvas.width = 256
+      paint.canvas.height = 128
+    }
     let context: CanvasRenderingContext2D | null = null
     try {
-      context = canvas.getContext('2d')
+      context = paint.canvas.getContext('2d')
     } catch {
-      return null
+      return false
     }
-    if (!context) return null
+    if (!context) return false
     context.fillStyle = muted ? '#8d939c' : '#14181e'
-    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
     context.fillStyle = muted ? '#2a3038' : '#f4efe4'
     context.font = 'bold 72px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
-    context.fillText(label, canvas.width / 2, canvas.height / 2)
-    const texture = new CanvasTexture(canvas)
-    texture.encoding = sRGBEncoding
-    texture.needsUpdate = true
-    return texture
+    context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2)
+    if (!paint.texture) {
+      paint.texture = new CanvasTexture(paint.canvas)
+      paint.texture.encoding = sRGBEncoding
+    }
+    paint.texture.needsUpdate = true
+    return true
   }
+}
+
+/** One canvas and one texture for a clock face. Redraws do not allocate another. */
+interface FacePaint {
+  signature: string
+  canvas: HTMLCanvasElement | null
+  texture: CanvasTexture | null
+  material: MeshStandardMaterial | null
 }

@@ -383,4 +383,46 @@ describe('offline GameSession', () => {
     expect(fresh.offerOfflineDraw('black')).toBe(true);
     expect(fresh.snapshot.outcome?.status).toBe('draw');
   });
+
+  it('moves the rook when castling and removes the passed pawn on en passant', () => {
+    const session = offline();
+    const move = (pieceId: string, from: string, to: string): void => {
+      const origin = from.charCodeAt(0) - 97;
+      const target = to.charCodeAt(0) - 97;
+      expect(
+        session.submitMoveIntent({
+          intentId: `${from}${to}`,
+          pieceId,
+          from: { file: origin, rank: 8 - Number(from[1]) },
+          to: { file: target, rank: 8 - Number(to[1]) },
+          source: 'pointer',
+        }),
+      ).toBe(true);
+    };
+    move('white-pawn-5', 'e2', 'e4');
+    move('black-pawn-1', 'a7', 'a6');
+    move('white-knight-2', 'g1', 'f3');
+    move('black-pawn-2', 'b7', 'b6');
+    move('white-bishop-2', 'f1', 'c4');
+    move('black-pawn-3', 'c7', 'c6');
+    move('white-king', 'e1', 'g1');
+    const rook = session.getPieces().find((piece) => piece.id === 'white-rook-2');
+    expect(rook?.square).toEqual({ file: 5, rank: 7 });
+  });
+
+  it('ignores a gameStart for a game other than the one it was asked to play', () => {
+    const session = offline();
+    session.expectGame('wanted1');
+    const seen: string[] = [];
+    session.subscribe((event) => {
+      if (event.type === 'game-started') seen.push(event.gameId);
+    });
+    session.onIncoming({ type: 'gameStart', gameId: 'other99', color: 'white', compatBoard: true });
+    expect(session.snapshot.gameId).toBeNull();
+    session.onIncoming({ type: 'gameStart', gameId: 'wanted1', color: 'black', compatBoard: true });
+    expect(session.snapshot.gameId).toBe('wanted1');
+    expect(seen).toEqual(['wanted1']);
+    session.onIncoming({ type: 'gameStart', gameId: 'later22', color: 'white', compatBoard: true });
+    expect(session.snapshot.gameId).toBe('wanted1');
+  });
 });

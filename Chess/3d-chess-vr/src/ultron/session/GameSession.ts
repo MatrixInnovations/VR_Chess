@@ -90,6 +90,8 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
   private pendingUci: string | null = null;
   /** Index in the move list where the in-flight move must appear. */
   private pendingPly = 0;
+  /** When set, a `gameStart` for any other id is someone else's ongoing game. */
+  private expectedGameId: string | null = null;
   /** Move list we have already estimated a clock for. A shorter stream prefix must not rewind it. */
   private optimisticMoves: readonly string[] = [];
   private lastTakebackKey = '';
@@ -383,10 +385,22 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
   }
 
   /**
+   * The only game this session should adopt from the event stream.
+   * Lichess sends `gameStart` for every ongoing game when the stream opens.
+   * @param gameId - Id from the seek, challenge, or the first new game after those.
+   */
+  expectGame(gameId: string): void {
+    this.expectedGameId = gameId;
+  }
+
+  /**
    * @param event - Incoming event stream.
    */
   onIncoming(event: IncomingEvent): void {
     if (event.type === 'gameStart') {
+      if (this.expectedGameId && event.gameId !== this.expectedGameId) return;
+      if (!this.expectedGameId && this.gameId && this.gameId !== event.gameId) return;
+      this.expectedGameId = event.gameId;
       this.gameId = event.gameId;
       this.ourColor = event.color;
       this.boardCompatible = event.compatBoard !== false;

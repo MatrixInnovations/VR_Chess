@@ -17,6 +17,10 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
   private seekAbort: AbortController | null = null;
   private gameAbort: AbortController | null = null;
   private activeGameId: string | null = null;
+  /** Games already running when the stream opened. A new seek must not join them. */
+  private readonly foreignGames = new Set<string>();
+  private baselining = false;
+  private acceptNewGame = false;
   private starting: Promise<TransportResult> | null = null;
   private accountLabel = 'Lichess';
 
@@ -63,7 +67,7 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
    * @param signal - Abort signal. This cancels the seek.
    */
   async seek(request: SeekRequest, signal: AbortSignal): Promise<TransportResult> {
-    const ready = await this.ensureStarted(signal);
+    const ready = await this.prepareForNewGame(signal);
     if (!ready.ok) return ready;
     const token = this.tokens.getAccessToken();
     if (!token) return TransportResult.fail('unauthorized', 'No access token');
@@ -89,7 +93,7 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
    * @param signal - Abort signal.
    */
   async challenge(username: string, request: ChallengeRequest, signal: AbortSignal): Promise<TransportResult> {
-    const ready = await this.ensureStarted(signal);
+    const ready = await this.prepareForNewGame(signal);
     if (!ready.ok) return ready;
     const token = this.tokens.getAccessToken();
     if (!token) return TransportResult.fail('unauthorized', 'No access token');
@@ -101,7 +105,7 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
    * @param signal - Abort signal.
    */
   async acceptChallenge(challengeId: string, signal: AbortSignal): Promise<TransportResult> {
-    const ready = await this.ensureStarted(signal);
+    const ready = await this.prepareForNewGame(signal);
     if (!ready.ok) return ready;
     const token = this.tokens.getAccessToken();
     if (!token) return TransportResult.fail('unauthorized', 'No access token');
@@ -147,6 +151,23 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
     this.inbox = null;
   }
 
+  /**
+   * Open the event stream, remember games that are already running, then accept the next new one.
+   * The short wait lets the initial `gameStart` burst arrive before a seek is posted.
+   */
+  private async prepareForNewGame(signal: AbortSignal): Promise<TransportResult> {
+    const ready = await this.ensureStarted(signal);
+    if (!ready.ok) return ready;
+    if (!this.acceptNewGame) {
+      this.baselining = true;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      this.baselining = false;
+      this.acceptNewGame = true;
+    }
+    this.activeGameId = null;
+    return ready;
+  }
+
   private ensureStarted(signal: AbortSignal): Promise<TransportResult> {
     if (this.isDisposed) return Promise.resolve(TransportResult.fail('cancelled', 'Player is disposed'));
     if (!this.tokens.getAccessToken()) return Promise.resolve(TransportResult.fail('unauthorized', 'No access token'));
@@ -173,8 +194,17 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
     if (signal.aborted) return TransportResult.fail('cancelled', 'Stream aborted');
     const opened = this.client.openEventStream(token, this.events.signal, {
       onEvent: (event) => {
+        if (event.type === 'gameStart') {
+          if (this.baselining || this.foreignGames.has(event.gameId)) {
+            this.foreignGames.add(event.gameId);
+            return;
+          }
+          if (this.activeGameId && this.activeGameId !== event.gameId) return;
+          this.inbox?.onIncoming(event);
+          this.watchGame(token, event.gameId);
+          return;
+        }
         this.inbox?.onIncoming(event);
-        if (event.type === 'gameStart') this.watchGame(token, event.gameId);
       },
       onFault: (fault) => this.inbox?.onStreamFault(fault),
     });

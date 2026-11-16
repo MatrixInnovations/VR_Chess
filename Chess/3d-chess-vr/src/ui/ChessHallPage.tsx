@@ -32,7 +32,9 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
-    const expose = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_E2E === '1'
+    const expose =
+      process.env.NODE_ENV !== 'production' ||
+      (window as Window & { __E2E__?: boolean }).__E2E__ === true
     if (expose) global.__CHESS_APP__ = model
     void model.completeRedirectIfPresent(window.location.href)
     return () => {
@@ -145,9 +147,13 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
       </p>
       <div className="hall-stage">
         <Canvas
-          shadows
+          shadows="percentage"
           camera={model.runtime.hall.camera}
           onCreated={(state: RootState) => {
+            if (state.gl.shadowMap) {
+              state.gl.shadowMap.autoUpdate = false
+              state.gl.shadowMap.needsUpdate = true
+            }
             model.attachPointer(state.gl.domElement as unknown as PointerSurface)
           }}
         >
@@ -176,8 +182,9 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
  * @returns Nothing visible.
  */
 function HallTicker({ model }: { model: ChessApplication }): null {
-  useFrame(() => {
+  useFrame((state) => {
     model.frame()
+    if (model.runtime.animator.isAnimating() && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
   })
   return null
 }

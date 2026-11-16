@@ -50,6 +50,36 @@ describe('ChessJsRules', () => {
     expect(queen.opponentHasMatingMaterial('black')).toBe(true);
   });
 
+  it('castles both ways, refuses castling through check, and plays en passant only on the next ply', () => {
+    const kingside = new ChessJsRules('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
+    expect(kingside.play({ from: 'e1', to: 'g1' })?.uci).toBe('e1g1');
+    const queenside = new ChessJsRules('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
+    expect(queenside.play({ from: 'e1', to: 'c1' })?.uci).toBe('e1c1');
+    const throughCheck = new ChessJsRules('4q3/8/8/8/8/8/8/R3K2R w KQ - 0 1');
+    expect(throughCheck.play({ from: 'e1', to: 'g1' })).toBeNull();
+
+    const enPassant = new ChessJsRules('rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3');
+    expect(enPassant.play({ from: 'e5', to: 'd6' })?.uci).toBe('e5d6');
+    const missed = new ChessJsRules('rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3');
+    expect(missed.play({ from: 'a2', to: 'a3' })).not.toBeNull();
+    expect(missed.legalMoves().some((move) => move.to === 'd6' && move.from === 'e5')).toBe(false);
+  });
+
+  it('replays an underpromotion and recognises threefold, the 50-move rule, and insufficient material', () => {
+    const promoted = new ChessJsRules();
+    expect(promoted.replay('k7/4P3/8/8/8/8/8/4K3 w - - 0 1', ['e7e8n'])).toBe(true);
+    expect(promoted.fen().toLowerCase()).toContain('n');
+
+    const repeated = new ChessJsRules();
+    expect(
+      repeated.replay('startpos', ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8']),
+    ).toBe(true);
+    expect(repeated.isDraw()).toBe(true);
+
+    expect(new ChessJsRules('k7/8/8/8/8/8/8/K7 w - - 100 60').isDraw()).toBe(true);
+    expect(new ChessJsRules('k7/8/8/8/8/8/8/K7 w - - 0 1').isDraw()).toBe(true);
+  });
+
   it('replays a UCI list from the start and rejects a broken list', () => {
     const rules = new ChessJsRules();
     expect(rules.replay('startpos', ['e2e4', 'e7e5'])).toBe(true);

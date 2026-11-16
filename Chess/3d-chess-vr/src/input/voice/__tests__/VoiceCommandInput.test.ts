@@ -348,6 +348,26 @@ describe('VoiceCommandInput', () => {
   })
 })
 
+describe('VoiceCommandInput confirmation', () => {
+  it('cancels a pending move on no and resolves which piece from the remembered list', async () => {
+    const speech = new FakeSpeech()
+    const session = createSession([
+      { from: 'g1', to: 'f3' },
+      { from: 'b1', to: 'c3' },
+    ])
+    const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
+    await input.start()
+    speech.emit('knight')
+    expect(session.submitMoveIntent).not.toHaveBeenCalled()
+    speech.emit('no')
+    expect(session.submitMoveIntent).not.toHaveBeenCalled()
+    speech.emit('knight')
+    speech.emit('b1')
+    speech.emit('yes')
+    expect(session.submitMoveIntent).toHaveBeenCalledWith({ from: 'b1', to: 'c3', source: 'voice' })
+  })
+})
+
 describe('VoiceCommandInput session boundary', () => {
   it('never calls a board writer even if one is attached beside the session port', async () => {
     const speech = new FakeSpeech()

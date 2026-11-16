@@ -29,6 +29,8 @@ export interface LichessClientOptions {
   readonly log?: IDiagnosticLog;
   /** Safety cap on extra GET attempts after the first. Not a Lichess-published number. */
   readonly maxStreamResumes?: number;
+  /** Quiet time before a half-open stream is aborted and resumed. Tests pass a small value. */
+  readonly streamIdleMs?: number;
 }
 
 interface StreamHandle<T> {
@@ -48,6 +50,7 @@ export class LichessClient {
   private readonly schedule: IRetrySchedule;
   private readonly log: IDiagnosticLog;
   private readonly maxStreamResumes: number;
+  private readonly streamIdleMs: number;
   private readonly parser = new BoardEventParser();
 
   /**
@@ -59,6 +62,7 @@ export class LichessClient {
     this.schedule = options.schedule ?? new StreamRetrySchedule();
     this.log = options.log ?? { write: () => undefined };
     this.maxStreamResumes = options.maxStreamResumes ?? 50;
+    this.streamIdleMs = options.streamIdleMs ?? 20_000;
   }
 
   /**
@@ -327,7 +331,15 @@ export class LichessClient {
       }
       settle(TransportResult.ok());
       try {
-        terminal = await this.readStream(response, signal, handle, kind, terminal);
+        const outcome: { terminal: boolean; healthy: boolean } = await this.readStream(
+          response,
+          signal,
+          handle,
+          kind,
+          terminal,
+        );
+        terminal = outcome.terminal;
+        if (outcome.healthy) resumes = 0;
       } catch (error) {
         if (signal.aborted || isAbortError(error)) return;
         if (terminal) return;
@@ -360,8 +372,9 @@ export class LichessClient {
     handle: StreamHandle<T>,
     kind: 'board' | 'incoming',
     alreadyTerminal: boolean,
-  ): Promise<boolean> {
+  ): Promise<{ terminal: boolean; healthy: boolean }> {
     let terminal = alreadyTerminal;
+    let healthy = false;
     const decoder = new NdjsonStreamDecoder();
     const deliver = (batch: { values: readonly unknown[]; errors: readonly string[] }): void => {
       for (const message of batch.errors) {
@@ -382,17 +395,91 @@ export class LichessClient {
         }
       }
     };
-    if (!response.body) return terminal;
+    if (!response.body) return { terminal, healthy };
+    let failure: unknown = null;
     const reading = (async (): Promise<void> => {
-      for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-        if (signal.aborted) throw abortFromSignal();
+      await this.consume(response.body as AsyncIterable<Uint8Array>, signal, (chunk) => {
+        healthy = true;
         deliver(decoder.push(chunk));
-      }
+      });
       deliver(decoder.end());
     })();
-    await Promise.race([reading, this.abortPromise(signal)]);
+    // Abort can win the race while `reading` rejects a moment later. Catch it so that is not unhandled.
+    reading.catch((error: unknown) => {
+      failure = error;
+    });
+    await Promise.race([reading.then(() => undefined, () => undefined), this.abortPromise(signal)]);
     if (signal.aborted) throw abortFromSignal();
-    return terminal;
+    if (failure) throw failure;
+    return { terminal, healthy };
+  }
+
+  /**
+   * Read a body with `getReader` when the stream has one.
+   * Safari's ReadableStream is not async-iterable. An idle timer resumes a half-open socket.
+   */
+  private async consume(
+    body: AsyncIterable<Uint8Array>,
+    signal: AbortSignal,
+    onChunk: (chunk: Uint8Array) => void,
+  ): Promise<void> {
+    const readable = body as AsyncIterable<Uint8Array> & {
+      getReader?: () => {
+        read: () => Promise<{ done: boolean; value?: Uint8Array }>;
+        releaseLock?: () => void;
+      };
+    };
+    if (typeof readable.getReader === 'function') {
+      const reader = readable.getReader();
+      try {
+        for (;;) {
+          const next = await this.nextChunk(reader.read(), signal);
+          if (next.done) return;
+          if (next.value) onChunk(next.value);
+        }
+      } finally {
+        reader.releaseLock?.();
+      }
+    }
+    const iterator = body[Symbol.asyncIterator]();
+    for (;;) {
+      const next = await this.nextChunk(iterator.next(), signal);
+      if (next.done) return;
+      onChunk(next.value);
+    }
+  }
+
+  /** One chunk, or an idle timeout, or the caller's abort. */
+  private nextChunk<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+    if (this.streamIdleMs <= 0) return pending;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const error = new Error('Stream went quiet');
+        error.name = 'IdleTimeout';
+        reject(error);
+      }, this.streamIdleMs);
+      const onAbort = (): void => {
+        clearTimeout(timer);
+        reject(abortFromSignal());
+      };
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+      pending.then(
+        (value) => {
+          clearTimeout(timer);
+          signal.removeEventListener('abort', onAbort);
+          resolve(value);
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          signal.removeEventListener('abort', onAbort);
+          reject(error);
+        },
+      );
+    });
   }
 
   private isTerminalBoard(event: BoardGameEvent): boolean {
@@ -521,8 +608,28 @@ export class LichessClient {
   }
 
   private async drain(body: AsyncIterable<Uint8Array>, signal: AbortSignal): Promise<void> {
-    for await (const _chunk of body) {
-      if (signal.aborted) return;
+    try {
+      const readable = body as AsyncIterable<Uint8Array> & {
+        getReader?: () => { read: () => Promise<{ done: boolean }>; releaseLock?: () => void };
+      };
+      if (typeof readable.getReader === 'function') {
+        const reader = readable.getReader();
+        try {
+          for (;;) {
+            const next = await reader.read();
+            if (signal.aborted || next.done) return;
+          }
+        } finally {
+          reader.releaseLock?.();
+        }
+        return;
+      }
+      for await (const _chunk of body) {
+        if (signal.aborted) return;
+      }
+    } catch (error) {
+      if (signal.aborted || isAbortError(error)) return;
+      throw error;
     }
   }
 

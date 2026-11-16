@@ -30,7 +30,5 @@ jobs:
         run: npm ci && npm run typecheck && npm run test:coverage
       - name: Build
         run: npm run build
-        env:
-          NEXT_PUBLIC_E2E: '1'
       - name: Browser smoke
         run: npx playwright install --with-deps chromium && npx playwright test

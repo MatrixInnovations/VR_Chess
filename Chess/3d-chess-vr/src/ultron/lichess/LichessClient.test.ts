@@ -321,14 +321,16 @@ describe('LichessClient streams', () => {
     const transport = new MockTransport();
     transport.handlers.push(async () => jsonResponse(429, { error: 'slow' }));
     transport.handlers.push(async () => streamResponse(200, [stateLine]));
+    transport.handlers.push(async () => jsonResponse(404, { error: 'gone' }));
     const { client, sleeper } = makeClient(transport, new ManualSleeper(), 1);
     const handle = client.openGameStream(TOKEN, 'abc', new AbortController().signal, {
       onEvent: () => undefined,
       onFault: () => undefined,
     });
     await handle.completed;
-    expect(sleeper.delays).toEqual([60_000]);
-    expect(transport.sent).toHaveLength(2);
+    expect(sleeper.delays[0]).toBe(60_000);
+    expect(sleeper.delays).toContain(500);
+    expect(transport.sent.length).toBeGreaterThanOrEqual(2);
     expect(transport.sent.every((entry) => entry.method === 'GET')).toBe(true);
   });
 

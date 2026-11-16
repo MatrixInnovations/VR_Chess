@@ -118,4 +118,74 @@ describe('LichessPlayer', () => {
     expect(denied.ok).toBe(false);
     expect(transport.sent.some((entry) => entry.url.includes('/api/board/seek'))).toBe(false);
   });
+
+  it('does not join a game that was already running when the stream opened', async () => {
+    const transport = new MockTransport();
+    const encoder = new TextEncoder();
+    let followUp = '';
+    let closed = false;
+    transport.handlers.push(async () => json({ id: 'ada', username: 'Ada' }));
+    transport.handlers.push(async () => ({
+      status: 200,
+      headers: {},
+      text: async () => '',
+      body: (async function* body() {
+        yield encoder.encode(
+          '{"type":"gameStart","game":{"id":"oldGame1","color":"white","compat":{"board":true}}}\n',
+        );
+        for (;;) {
+          if (followUp) {
+            const line = followUp;
+            followUp = '';
+            yield encoder.encode(line);
+          }
+          if (closed) return;
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+      })(),
+    }));
+    transport.handlers.push(async () => hanging());
+    transport.handlers.push(async () => hanging());
+    const lichess = new LichessClient({ transport, sleeper: new ManualSleeper(), maxStreamResumes: 0, streamIdleMs: 0 });
+    const player = new LichessPlayer(lichess, new StaticToken('lip_testtokenvalue'));
+    const session = GameSession.online({
+      rules: new ChessJsRules(),
+      ids: new SequentialIds('s'),
+      now: () => 0,
+      sessionId: 'pick',
+      player,
+    });
+    const pending = session.seek({ kind: 'realtime', timeMinutes: 10, incrementSeconds: 0 });
+    await waitFor(() => transport.sent.some((entry) => entry.url.includes('/api/board/seek')), 'seek');
+    expect(session.snapshot.gameId).toBeNull();
+    followUp = '{"type":"gameStart","game":{"id":"newGame1","color":"black","compat":{"board":true}}}\n';
+    await waitFor(() => session.snapshot.gameId === 'newGame1', 'new game');
+    expect(session.snapshot.gameId).not.toBe('oldGame1');
+    closed = true;
+    session.dispose();
+    await pending;
+  });
+
+  it('posts decline, resign, and abort, and refuses them without a token', async () => {
+    const transport = new MockTransport();
+    const lichess = new LichessClient({ transport, sleeper: new ManualSleeper(), maxStreamResumes: 0 });
+    const signedOut = new LichessPlayer(lichess, new StaticToken(null));
+    const signal = new AbortController().signal;
+    expect((await signedOut.playMove('g', 'e2e4', signal)).ok).toBe(false);
+    expect((await signedOut.declineChallenge('c', 'generic', signal)).ok).toBe(false);
+    expect((await signedOut.resign('g', signal)).ok).toBe(false);
+    expect((await signedOut.abortGame('g', signal)).ok).toBe(false);
+
+    const signedIn = new LichessPlayer(lichess, new StaticToken('lip_testtokenvalue'));
+    transport.handlers.push(async () => json({ ok: true }));
+    transport.handlers.push(async () => json({ ok: true }));
+    transport.handlers.push(async () => json({ ok: true }));
+    expect((await signedIn.declineChallenge('c1', 'later', signal)).ok).toBe(true);
+    expect((await signedIn.resign('game1', signal)).ok).toBe(true);
+    expect((await signedIn.abortGame('game1', signal)).ok).toBe(true);
+    const urls = transport.sent.map((entry) => entry.url);
+    expect(urls.some((url) => url.includes('/challenge/c1/decline'))).toBe(true);
+    expect(urls.some((url) => url.endsWith('/resign'))).toBe(true);
+    expect(urls.some((url) => url.endsWith('/abort'))).toBe(true);
+  });
 });

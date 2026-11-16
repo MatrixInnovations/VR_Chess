@@ -13,6 +13,7 @@ import type { ITakebackEtiquette } from '../ultron/session/GameSession'
 import { TimeControlLabel } from './TimeControlLabel'
 
 const SCOPES = ['board:play', 'challenge:read', 'challenge:write'] as const
+const USERNAME_KEY = 'ultron.lichess.username'
 
 /**
  * What the table asks the hall to do when a lobby button is pressed.
@@ -60,6 +61,14 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
     private readonly redirectUri: string,
   ) {
     this.client = new LichessClient({ transport, sleeper: new TimerSleeper() })
+    if (this.clientId.trim()) {
+      this.oauth = this.buildOauth()
+      const saved = this.store.get(USERNAME_KEY)
+      if (saved && this.oauth.getAccessToken()) {
+        this.username = saved
+        this.state = 'online'
+      }
+    }
   }
 
   /**
@@ -86,6 +95,7 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
     const account = await this.client.getAccount(accessToken, new AbortController().signal)
     if (!account.ok) throw new Error(account.result.message)
     this.username = account.username
+    this.store.set(USERNAME_KEY, account.username)
     this.state = 'online'
     this.error = null
     return { username: account.username }
@@ -102,6 +112,7 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
       if (!revoked.ok) this.error = { code: 'revoke', message: revoked.message }
     } finally {
       this.oauth.forget()
+      this.store.delete(USERNAME_KEY)
       this.username = null
       this.state = 'idle'
     }
@@ -250,18 +261,20 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
     if (!this.clientId.trim()) {
       throw new Error('Set NEXT_PUBLIC_LICHESS_CLIENT_ID to your Lichess OAuth client id. No token belongs in the repo.')
     }
-    if (!this.oauth) {
-      this.oauth = new OAuthPkceClient({
-        clientId: this.clientId,
-        redirectUri: this.redirectUri,
-        scopes: SCOPES,
-        store: this.store,
-        random: new WebCryptoRandom(),
-        digest: new WebCryptoSha256(),
-        transport: this.transport,
-      })
-    }
+    if (!this.oauth) this.oauth = this.buildOauth()
     return this.oauth
+  }
+
+  private buildOauth(): OAuthPkceClient {
+    return new OAuthPkceClient({
+      clientId: this.clientId,
+      redirectUri: this.redirectUri,
+      scopes: SCOPES,
+      store: this.store,
+      random: new WebCryptoRandom(),
+      digest: new WebCryptoSha256(),
+      transport: this.transport,
+    })
   }
 
   private async waitFor(session: GameSession): Promise<GameHandle> {
