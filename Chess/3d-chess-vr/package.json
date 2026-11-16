@@ -28,7 +28,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@playwright/test": "1.55.1",
+    "@playwright/test": "1.65.1",
     "@testing-library/react": "^14.3.1",
     "@types/three": "^0.146.0",
     "@vitest/coverage-v8": "^3.2.4",

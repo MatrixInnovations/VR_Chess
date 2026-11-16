@@ -12,6 +12,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async headers() {
+    // `next dev` compiles the page with eval. Production responses stay on 'self'.
+    const devScripts = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-inline' 'unsafe-eval'"
     return [
       {
         source: '/:path*',
@@ -24,7 +26,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self'",
+              `script-src 'self'${devScripts}`,
               "style-src 'self'",
               "img-src 'self' data: blob:",
               "connect-src 'self' https://lichess.org",
