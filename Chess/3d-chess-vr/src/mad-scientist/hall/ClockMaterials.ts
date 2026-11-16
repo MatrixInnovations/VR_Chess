@@ -10,7 +10,14 @@ import type { ClockFaceExpiry } from './ClockViewMirror'
  * No texture maps: the hall's Quest budget still counts sampled textures.
  */
 export class ClockMaterials {
-  readonly body = new MeshPhysicalMaterial({ color: 0x1a1c20, roughness: 0.28, metalness: 0.85, clearcoat: 0.1 })
+  readonly body = new MeshPhysicalMaterial({
+    color: 0xd5d8df,
+    emissive: 0x6a707a,
+    emissiveIntensity: 0.35,
+    roughness: 0.22,
+    metalness: 0.45,
+    clearcoat: 0.2,
+  })
 
   readonly running = new MeshPhysicalMaterial({ color: 0xe8e4dc, roughness: 0.45, metalness: 0.05, clearcoat: 0 })
 

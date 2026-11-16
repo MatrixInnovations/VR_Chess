@@ -22,7 +22,6 @@ import {
   TABLE_TOP_Y,
 } from './metrics'
 import { PieceMaterialSet } from './PieceMaterialSet'
-import { stampTileSeed } from './MarbleVeins'
 import { disposePieceGeometries } from './PieceGeometryCache'
 import { PieceModel } from './PieceModel'
 import { TableDecals } from './TableDecals'
@@ -106,9 +105,9 @@ export class ChessHall {
 
   /** Hero framing for the desktop shot. XR keeps the seated eye. */
   frameDesktop(): void {
-    this.camera.fov = 36
-    this.camera.position.set(0.08, 1.05, 0.66)
-    this.camera.lookAt(0, 0.8, 0.04)
+    this.camera.fov = 40
+    this.camera.position.set(0, 1.06, 0.47)
+    this.camera.lookAt(0, 0.76, -0.06)
     this.camera.updateProjectionMatrix()
   }
 
@@ -322,7 +321,6 @@ export class ChessHall {
       const group = new Group()
       group.name = `column-${index}`
       const shaftGeometry = new CylinderGeometry(0.08, 0.08, 2.6, 12)
-      stampTileSeed(shaftGeometry, index + 1, 0)
       this.geometries.push(shaftGeometry)
       const shaft = new Mesh(shaftGeometry, stone)
       shaft.position.y = 1.3
@@ -414,7 +412,6 @@ export class ChessHall {
     castShadow = false,
   ): void {
     const geometry = new BoxGeometry(size.x, size.y, size.z)
-    stampTileSeed(geometry, 0, 0)
     const mesh = new Mesh(geometry, material)
     mesh.name = name
     mesh.position.set(position.x, position.y, position.z)

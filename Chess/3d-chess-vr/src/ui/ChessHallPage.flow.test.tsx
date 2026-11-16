@@ -102,6 +102,22 @@ describe('ChessHallPage controls', () => {
     expect(app.revision).toBeGreaterThan(0)
   })
 
+  it('shows 1:00 on a fresh 60 second game', () => {
+    const app = new ChessApplication({
+      whiteMs: 60_000,
+      blackMs: 60_000,
+      incrementMs: 0,
+      now: () => 5_000,
+      transport: new DeadTransport(),
+      storage: new MemoryKeyValueStore(),
+    })
+    render(<ChessHallPage app={app} />)
+    const white = screen.getByTestId('clock-white')
+    expect(white.textContent).toContain('1:00')
+    expect(white.textContent).not.toContain('—')
+    expect(white.getAttribute('data-expiry')).toBe('running')
+  })
+
   it('shows a dash and no cue when the clock is not a countdown', () => {
     const published = (kind: IFridaeClockSnapshot['kind'], white: number | null): IFridaeClockSnapshot => ({
       kind,

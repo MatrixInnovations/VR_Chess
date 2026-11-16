@@ -12,7 +12,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   webServer: {
-    command: 'npx next dev -p 3456',
+    command: 'NEXT_PUBLIC_E2E=1 npx next dev -p 3456',
     url: 'http://127.0.0.1:3456',
     reuseExistingServer: false,
     timeout: 120_000,

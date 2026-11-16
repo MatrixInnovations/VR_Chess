@@ -1,4 +1,5 @@
-import { ExtrudeGeometry, Shape } from 'three'
+import { BoxGeometry, BufferGeometry, ExtrudeGeometry, Shape, SphereGeometry } from 'three'
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 const mm = (value: number) => value / 1000
 
@@ -24,33 +25,72 @@ export function knightShape(): Shape {
   return shape
 }
 
-/** Extruded, bevelled horse head with a narrowed muzzle and cheek swell. */
-export function buildKnightHead(): ExtrudeGeometry {
+/**
+ * Staunton horse: a rounded profile, a muzzle bulb, a jaw, an ear, and a mane.
+ * The silhouette is still the side view. The cross-section is an oval, not a slab.
+ */
+export function buildKnightHead(): BufferGeometry {
   const geometry = new ExtrudeGeometry(knightShape(), {
-    depth: 0.016,
+    depth: 0.028,
     steps: 1,
-    curveSegments: 8,
+    curveSegments: 10,
     bevelEnabled: true,
-    bevelThickness: 0.0015,
-    bevelSize: 0.001,
+    bevelThickness: 0.0024,
+    bevelSize: 0.0018,
     bevelOffset: 0,
     bevelSegments: 3,
   })
-  geometry.translate(0, 0, -0.008)
+  geometry.translate(0, 0, -0.014)
   shapeKnight(geometry)
-  return geometry
+  const head = geometry.toNonIndexed()
+  geometry.dispose()
+  const parts = [
+    head,
+    place(new BoxGeometry(0.0034, 0.02, 0.012), -0.0065, 0.047, 0, 0.6),
+    place(new BoxGeometry(0.0026, 0.012, 0.009), 0.0005, 0.053, 0, -0.35),
+    place(new SphereGeometry(0.0064, 12, 8), 0.013, 0.039, 0, 0, 1.35, 0.7, 0.92),
+    place(new SphereGeometry(0.0052, 10, 7), 0.0075, 0.032, 0, 0, 1.15, 0.75, 0.88),
+    place(new SphereGeometry(0.0034, 8, 6), -0.0005, 0.0565, 0, 0, 0.5, 1.55, 0.62),
+  ]
+  const merged = mergeBufferGeometries(parts)
+  for (const part of parts) part.dispose()
+  if (!merged) throw new Error('knight head merge failed')
+  merged.computeVertexNormals()
+  return merged
+}
+
+function place(
+  geometry: BufferGeometry,
+  x: number,
+  y: number,
+  z: number,
+  rotZ = 0,
+  sx = 1,
+  sy = 1,
+  sz = 1,
+): BufferGeometry {
+  geometry.scale(sx, sy, sz)
+  geometry.rotateZ(rotZ)
+  geometry.translate(x, y, z)
+  const flat = geometry.toNonIndexed()
+  geometry.dispose()
+  return flat
 }
 
 function shapeKnight(geometry: ExtrudeGeometry): void {
   const position = geometry.getAttribute('position')
+  const half = 0.014
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index)
     const y = position.getY(index)
     const z = position.getZ(index)
-    const muzzle = Math.max(0, (x - 0.006) / 0.0108)
-    const cheek = Math.exp(-((x - 0.002) ** 2 + (y - 0.044) ** 2) / 4e-5)
-    const neck = y < 0.03 ? 1 + 0.15 * (1 - y / 0.03) : 1
-    position.setZ(index, z * (1 - 0.55 * muzzle) * (1 + 0.22 * cheek) * neck)
+    const muzzle = Math.max(0, (x - 0.004) / 0.012)
+    const cheek = Math.exp(-((x - 0.0) ** 2 + (y - 0.042) ** 2) / 5e-5)
+    const neck = y < 0.032 ? 1.18 : 1
+    const nz = Math.min(1, Math.abs(z) / half)
+    const round = Math.sqrt(Math.max(0.22, 1 - nz * nz))
+    const thickness = half * round * (1 - 0.4 * muzzle) * (1 + 0.3 * cheek) * neck
+    position.setZ(index, Math.sign(z) * thickness)
   }
   position.needsUpdate = true
   geometry.computeVertexNormals()

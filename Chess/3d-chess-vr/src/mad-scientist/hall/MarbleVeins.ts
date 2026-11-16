@@ -1,11 +1,7 @@
 import {
-  BufferAttribute,
-  BufferGeometry,
-  LinearEncoding,
   LinearFilter,
   LinearMipmapLinearFilter,
   Mesh,
-  MeshPhysicalMaterial,
   OrthographicCamera,
   PlaneGeometry,
   RepeatWrapping,
@@ -21,7 +17,7 @@ import type { PieceMaterialSet } from './PieceMaterialSet'
 
 /**
  * Per-square marble veins from Vision's recipe.
- * One shared physical material; the seed is a vertex attribute, not 64 shaders.
+ * The page bakes this once into a texture. Live materials sample that map.
  */
 /* v8 ignore start */
 const MARBLE_GLSL = /* glsl */ `
@@ -55,7 +51,7 @@ float fbm(vec2 p) {
   float value = 0.0;
   float amplitude = 0.5;
   float frequency = 1.0;
-  for (int octave = 0; octave < 5; octave++) {
+  for (int octave = 0; octave < 3; octave++) {
     value += amplitude * snoise(p * frequency);
     frequency *= 2.05;
     amplitude *= 0.5;
@@ -72,9 +68,8 @@ float marbleVeinAmt(vec2 uv, vec2 tile) {
   p += vec2(hash11(seed), hash11(seed + 7.1)) * 0.35;
   float q = fbm(p * 2.4 + seed);
   vec2 w = p + 0.22 * vec2(q, fbm(p * 2.4 + 19.2));
-  float rid = 1.0 - abs(snoise(w * 6.4 + seed));
-  float vein = pow(smoothstep(0.86, 0.995, rid), 2.4);
-  vein += 0.10 * pow(smoothstep(0.90, 0.995, 1.0 - abs(snoise(w * 12.8))), 2.6);
+  float rid = 1.0 - abs(snoise(w * 2.6 + seed));
+  float vein = pow(smoothstep(0.90, 0.995, rid), 2.4);
   return vein;
 }
 vec3 srgbToLinear(vec3 c) { return pow(c, vec3(2.2)); }
@@ -97,42 +92,12 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix) {
     color = mix(base, veinC, clamp(vein * veinMix, 0.0, 1.0));
   } else {
     vec3 base = mix(srgbToLinear(vec3(0.941, 0.922, 0.890)), srgbToLinear(vec3(0.886, 0.867, 0.839)), body * 0.06);
-    color = mix(base, srgbToLinear(vec3(0.780, 0.760, 0.730)), clamp(vein, 0.0, 1.0));
+    color = mix(base, srgbToLinear(vec3(0.620, 0.600, 0.580)), clamp(vein, 0.0, 1.0));
   }
   return color;
 }
 `
 /* v8 ignore stop */
-
-/** Stamp a file/rank seed onto every vertex so neighboring squares do not repeat. */
-export function stampTileSeed(geometry: BufferGeometry, file: number, rank: number): void {
-  const count = geometry.getAttribute('position').count
-  const data = new Float32Array(count * 2)
-  for (let index = 0; index < count; index += 1) {
-    data[index * 2] = file
-    data[index * 2 + 1] = rank
-  }
-  geometry.setAttribute('tileSeed', new BufferAttribute(data, 2))
-}
-
-/** Compile the vein recipe into a shared physical material. */
-export function applyMarbleVeins(material: MeshPhysicalMaterial, dark: boolean): void {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uMarbleDark = { value: dark ? 1 : 0 }
-    shader.uniforms.uVeinMix = { value: dark ? 0.85 : 1 }
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec2 tileSeed;\nvarying vec2 vTileSeed;')
-      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvTileSeed = tileSeed;')
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec2 vTileSeed;\nuniform float uMarbleDark;\nuniform float uVeinMix;\n${MARBLE_GLSL}`)
-      .replace('#include <map_fragment>', 'diffuseColor.rgb = marbleAlbedo(vUv, vTileSeed, uMarbleDark, uVeinMix);')
-      .replace(
-        '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor + marbleVeinAmt(vUv, vTileSeed) * 0.06, 0.05, 0.35);',
-      )
-  }
-  material.customProgramCacheKey = () => (dark ? 'marble-dark' : 'marble-light')
-}
 
 /**
  * Draw the vein recipe once into render targets.
@@ -141,20 +106,22 @@ export function applyMarbleVeins(material: MeshPhysicalMaterial, dark: boolean):
  */
 export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, quest: boolean): void {
   if (typeof gl.setRenderTarget !== 'function' || typeof gl.render !== 'function') return
-  const size = quest ? 512 : 1024
+  const size = quest ? 512 : 2048
   const started = typeof performance !== 'undefined' ? performance.now() : 0
   const light = renderMarble(gl, size, 8, false, 1)
   const dark = renderMarble(gl, size, 8, true, 0.85)
-  const floor = renderMarble(gl, size, 1, true, 0.35)
-  const wall = renderMarble(gl, size, 1, true, 0.25)
+  const frame = renderMarble(gl, size, 1, true, 0.1)
+  const floor = renderMarble(gl, size, 1, true, 0.12)
+  const wall = renderMarble(gl, size, 1, true, 0.12)
   floor.texture.repeat.set(4, 4)
   wall.texture.repeat.set(1.5, 1.5)
   materials.installBakedMarble({
     light: light.texture,
     dark: dark.texture,
+    frame: frame.texture,
     floor: floor.texture,
     wall: wall.texture,
-    targets: [light, dark, floor, wall],
+    targets: [light, dark, frame, floor, wall],
   })
   if (typeof performance !== 'undefined') {
     const elapsed = performance.now() - started
@@ -198,7 +165,7 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
         vec2 tile = floor(vUv * uCells);
         vec2 localUv = fract(vUv * uCells);
         vec3 linear = marbleAlbedo(localUv, tile, uDark, uVeinMix);
-        gl_FragColor = vec4(pow(max(linear, vec3(0.0)), vec3(0.454545)), 1.0);
+        gl_FragColor = vec4(linear, 1.0);
       }
     `,
   })
@@ -208,12 +175,9 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
   const geometry = new PlaneGeometry(2, 2)
   scene.add(new Mesh(geometry, material))
   const previousTarget = gl.getRenderTarget()
-  const previousEncoding = gl.outputEncoding
-  gl.outputEncoding = LinearEncoding
   gl.setRenderTarget(target)
   gl.render(scene, camera)
   gl.setRenderTarget(previousTarget)
-  gl.outputEncoding = previousEncoding
   geometry.dispose()
   material.dispose()
   return target
@@ -222,6 +186,7 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
 export type BakedMarbleMaps = {
   light: Texture
   dark: Texture
+  frame: Texture
   floor: Texture
   wall: Texture
   targets: WebGLRenderTarget[]

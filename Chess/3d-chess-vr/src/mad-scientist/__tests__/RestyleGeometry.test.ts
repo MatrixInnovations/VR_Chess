@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BoxGeometry, LatheGeometry, MeshPhysicalMaterial, Scene, Texture } from 'three'
+import { LatheGeometry, Scene, Texture, WebGLRenderTarget } from 'three'
 import type { WebGLRenderer } from 'three'
 
 import { ChessHall } from '../hall/ChessHall'
@@ -10,38 +10,15 @@ import { createBoardReflector } from '../hall/BoardReflector'
 import { buildEnvironment, darkHallEnvScene } from '../hall/HallEnvironment'
 import { KING_HEIGHT_M } from '../hall/metrics'
 import { coordinateBorderTexture, paintCoordinateGlyphs } from '../hall/MarbleTexture'
-import { applyMarbleVeins, bakeMarbleGpu, stampTileSeed } from '../hall/MarbleVeins'
+import { bakeMarbleGpu } from '../hall/MarbleVeins'
 import { carveMitreSlit, disposePieceGeometries, pieceGeometry } from '../hall/PieceGeometryCache'
 import { PieceMaterialSet } from '../hall/PieceMaterialSet'
 import { LATHE_SEGMENTS, PROFILE } from '../hall/PieceProfiles'
 
 describe('marble veins', () => {
-  it('stamps a seed and compiles a light and a dark program', () => {
-    const geometry = new BoxGeometry(1, 1, 1)
-    stampTileSeed(geometry, 3, 4)
-    const seed = geometry.getAttribute('tileSeed')
-    expect(seed.getX(0)).toBe(3)
-    expect(seed.getY(0)).toBe(4)
-    const material = new MeshPhysicalMaterial()
-    applyMarbleVeins(material, true)
-    const shader = {
-      uniforms: {} as Record<string, { value: number }>,
-      vertexShader: '#include <common>\n#include <uv_vertex>\n',
-      fragmentShader: '#include <common>\n#include <map_fragment>\n#include <roughnessmap_fragment>\n',
-    }
-    material.onBeforeCompile(shader, {} as WebGLRenderer)
-    expect(shader.vertexShader).toContain('tileSeed')
-    expect(shader.fragmentShader).toContain('marbleAlbedo')
-    expect(shader.uniforms.uMarbleDark.value).toBe(1)
-    expect(material.customProgramCacheKey()).toBe('marble-dark')
-    applyMarbleVeins(material, false)
-    expect(material.customProgramCacheKey()).toBe('marble-light')
-    geometry.dispose()
-    material.dispose()
-  })
-
   it('draws the vein recipe into render targets when the renderer can draw', () => {
     const materials = new PieceMaterialSet()
+    const disposed = vi.spyOn(WebGLRenderTarget.prototype, 'dispose')
     const before = materials.boardSquare('light').map
     bakeMarbleGpu({} as WebGLRenderer, materials, false)
     expect(materials.boardSquare('light').map).toBe(before)
@@ -61,7 +38,48 @@ describe('marble veins', () => {
     expect(draws).toBeGreaterThan(4)
     expect(materials.boardSquare('light').map).not.toBe(before)
     expect(materials.floorWood().map).not.toBe(before)
+    expect(materials.boardFrame().map).not.toBe(materials.floorWood().map)
+    expect(disposed).toHaveBeenCalled()
+    disposed.mockRestore()
     materials.dispose()
+  })
+
+  it('bakes again after the WebGL context comes back', () => {
+    const hall = new ChessHall()
+    const scene = new Scene()
+    const listeners: Record<string, () => void> = {}
+    let draws = 0
+    const gl = {
+      outputEncoding: 3001,
+      domElement: {
+        style: {},
+        addEventListener(type: string, listener: () => void) {
+          listeners[type] = listener
+        },
+        removeEventListener() {
+          return undefined
+        },
+      },
+      getSize(target: { set: (x: number, y: number) => void }) {
+        target.set(32, 32)
+        return target
+      },
+      getRenderTarget: () => null,
+      setRenderTarget() {
+        draws += 1
+      },
+      render() {
+        draws += 1
+      },
+      xr: { addEventListener() { return undefined } },
+    } as unknown as WebGLRenderer
+    configureHallStage(gl, scene, hall.camera, hall, true, { bake: () => ({ texture: new Texture() }) })
+    const first = draws
+    expect(first).toBeGreaterThan(0)
+    expect(listeners.webglcontextrestored).toBeTypeOf('function')
+    listeners.webglcontextrestored()
+    expect(draws).toBeGreaterThan(first)
+    hall.dispose()
   })
 })
 
@@ -212,8 +230,8 @@ describe('hall stage', () => {
       },
       bake: () => ({ texture: environment }),
     })
-    expect(hall.camera.fov).toBe(36)
-    expect(hall.camera.position.z).toBeCloseTo(0.66)
+    expect(hall.camera.fov).toBe(40)
+    expect(hall.camera.position.z).toBeCloseTo(0.47)
     expect(hall.reflector).toBeTruthy()
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
@@ -308,7 +326,7 @@ describe('desktop stage without the mirror', () => {
     })
     expect(hall.reflector).toBeNull()
     expect(hall.grade).toBeNull()
-    expect(hall.camera.fov).toBe(36)
+    expect(hall.camera.fov).toBe(40)
     expect(hall.orbit).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)

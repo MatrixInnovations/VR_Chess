@@ -16,7 +16,7 @@ const FACE_INK: Record<ClockFaceExpiry, { background: string; digit: string }> =
   running: { background: '#141210', digit: '#f3efe6' },
   'provisional-expired': { background: '#c9a44c', digit: '#0e0e10' },
   'confirmed-flag': { background: '#1a0505', digit: '#f3efe6' },
-  'offline-local-flag': { background: '#c06a38', digit: '#0e0e10' },
+  'offline-local-flag': { background: '#f2c2a0', digit: '#140c0a' },
   'no-clock': { background: '#0e0e10', digit: '#d4af37' },
 }
 
@@ -57,7 +57,14 @@ export class PhysicalChessClock {
     const rimGeo = new PlaneGeometry(0.172, 0.082)
     this.rim = new Mesh(
       rimGeo,
-      new MeshPhysicalMaterial({ color: 0xc9a44c, metalness: 1, roughness: 0.22, clearcoat: 0.15 }),
+      new MeshPhysicalMaterial({
+        color: 0xf0d78a,
+        emissive: 0xc9a44c,
+        emissiveIntensity: 0.55,
+        metalness: 0.55,
+        roughness: 0.18,
+        clearcoat: 0.25,
+      }),
     )
     this.rim.name = 'clock-rim'
     this.rim.rotation.x = -Math.PI / 2
@@ -145,19 +152,19 @@ export class PhysicalChessClock {
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
     if (expiry === 'confirmed-flag' || expiry === 'offline-local-flag') {
       context.strokeStyle = '#ff4d4d'
-      context.lineWidth = 10
-      context.strokeRect(6, 6, paint.canvas.width - 12, paint.canvas.height - 12)
+      context.lineWidth = 8
+      context.strokeRect(12, 12, paint.canvas.width - 24, paint.canvas.height - 24)
       context.fillStyle = '#ff4d4d'
-      context.font = 'bold 28px Georgia, serif'
+      context.font = 'bold 18px Georgia, serif'
       context.textAlign = 'center'
       context.textBaseline = 'middle'
-      context.fillText('FLAG', paint.canvas.width / 2, 24)
+      context.fillText('FLAG', paint.canvas.width / 2, 22)
     }
     context.fillStyle = low ? '#ffd8b0' : ink.digit
-    context.font = 'bold 72px Georgia, serif'
+    context.font = 'bold 64px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
-    context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2)
+    context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2 + 10)
     if (low) {
       context.fillStyle = '#ffc9a0'
       context.fillRect(18, paint.canvas.height - 16, paint.canvas.width - 36, 10)

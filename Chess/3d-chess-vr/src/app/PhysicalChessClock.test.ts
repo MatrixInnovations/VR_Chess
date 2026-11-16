@@ -33,7 +33,7 @@ function recordingContext(): { context: CanvasRenderingContext2D; draws: Draw[] 
       draws.push({ style: fillStyle, kind: 'text', text })
     },
     strokeRect() {
-      return undefined
+      draws.push({ style: String((context as { strokeStyle: string }).strokeStyle), kind: 'rect', text: 'rim' })
     },
   }
   return { context: context as unknown as CanvasRenderingContext2D, draws }
@@ -112,6 +112,7 @@ describe('PhysicalChessClock low time', () => {
     const clock = new PhysicalChessClock()
     clock.apply(snap(face({ expiry: 'confirmed-flag', remainingMs: 0, label: '0:00', isActive: false })))
     expect(draws.some((draw) => draw.kind === 'text' && draw.text === 'FLAG' && draw.style === '#ff4d4d')).toBe(true)
+    expect(draws.some((draw) => draw.text === 'rim' && draw.style === '#ff4d4d')).toBe(true)
     expect(draws.some((draw) => draw.kind === 'text' && draw.style === '#ffd8b0')).toBe(false)
     clock.dispose()
   })

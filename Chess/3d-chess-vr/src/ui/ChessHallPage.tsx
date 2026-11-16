@@ -221,7 +221,11 @@ function HallTicker({ model }: { model: ChessApplication }): null {
   useFrame((state) => {
     if (!flags.current && typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
-      flags.current = { probe: params.get('probe') === '1', norender: params.get('norender') === '1' }
+      const e2e = process.env.NEXT_PUBLIC_E2E === '1'
+      flags.current = {
+        probe: e2e && params.get('probe') === '1',
+        norender: e2e && params.get('norender') === '1',
+      }
     }
     model.frame()
     const animating = model.runtime.animator.isAnimating()

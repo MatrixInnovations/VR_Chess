@@ -101,6 +101,10 @@ export function configureHallStage(
     }
   }
   bakeMarbleGpu(gl, hall.materials, quest)
+  const canvas = gl.domElement as { addEventListener?: (type: string, listener: () => void) => void } | undefined
+  canvas?.addEventListener?.('webglcontextrestored', () => {
+    bakeMarbleGpu(gl, hall.materials, quest)
+  })
   const starter = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
   scene.environment = starter
   if (typeof gl.compile === 'function') gl.compile(scene, camera)
@@ -134,7 +138,7 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
     (hdr) => {
       hdr.mapping = UVMapping
       const room = new Scene()
-      const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, color: 0x404040, side: BackSide }))
+      const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, color: 0xffffff, side: BackSide }))
       sphere.rotation.y = 0.35
       room.add(sphere)
       replaceEnvironment(scene, buildEnvironment(gl, room, bake))

@@ -100,16 +100,16 @@ export class PieceMaterialSet {
     this.scratch = scratch
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 1, 0.08, 0.06, 1.5))
-    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.06, 0.08, 1.15))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 1.5))
-    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.06, 0.08, 1.15))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 0.7, 0.08, 0.06, 1.5))
-    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.06, 0.08, 1.15))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.12, 0.04, 2.6))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.18, 0.05, 3.4))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.12, 0.04, 2.6))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.18, 0.05, 3.4))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.12, 0.04, 2.6))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.18, 0.05, 3.4))
 
     this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4))
     this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 0.15))
-    this.put('board:frame', this.marble(floorTile, 0.13, 0.2, 0.18, 0.4))
+    this.put('board:frame', this.marble(floorTile, 0.08, 0.85, 0.08, 0.28))
     this.put(
       'board:highlight',
       this.make({
@@ -293,28 +293,30 @@ export class PieceMaterialSet {
     dark.depthWrite = !enabled
   }
 
-  /** Swap the placeholder marble maps for the GPU bake. Shared slabs keep their repeat. */
+  /** Swap the placeholder marble maps for the GPU bake. Old targets are released first. */
   installBakedMarble(baked: BakedMarbleMaps): void {
-    const previous = new Set<Texture>()
+    const stale: Texture[] = []
     const assign = (key: string, texture: Texture) => {
       const material = this.table.get(key) as MeshStandardMaterial
-      if (material.map && material.map !== texture) previous.add(material.map)
+      if (material.map && material.map !== texture) stale.push(material.map)
       material.map = texture
       material.needsUpdate = true
     }
     assign('board:light', baked.light)
     assign('board:dark', baked.dark)
-    assign('board:frame', baked.floor)
+    assign('board:frame', baked.frame)
     assign('room:floor', baked.floor)
     assign('room:table', baked.floor)
     assign('room:wall', baked.wall)
     assign('room:plaster', baked.wall)
-    for (const texture of previous) {
-      texture.dispose()
-      const index = this.textures.indexOf(texture)
-      if (index >= 0) this.textures.splice(index, 1)
-    }
+    for (const target of this.bakeTargets) target.dispose()
     this.bakeTargets = baked.targets
+    for (const texture of stale) {
+      const index = this.textures.indexOf(texture)
+      if (index < 0) continue
+      texture.dispose()
+      this.textures.splice(index, 1)
+    }
   }
 
   /**
