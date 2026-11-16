@@ -494,9 +494,14 @@ export class ChessApplication {
     await this.voice.start()
     const clarifying = this.message.startsWith('Confirm') || this.message.startsWith('Which') || this.message.startsWith("Didn't")
     if (!clarifying) {
-      this.message = this.voice.isActive()
-        ? 'Listening. Voice uses your browser’s speech service. Try “move pawn to e4”.'
-        : 'Voice isn’t supported in this browser.'
+      const status = this.voice.speechStatus()
+      if (status === 'denied') {
+        this.message = 'Allow microphone access in the browser site settings. Spoken moves need desktop Chrome or Edge.'
+      } else if (!this.voice.isActive()) {
+        this.message = 'Voice is not supported in this browser. Spoken moves need desktop Chrome or Edge, not Quest.'
+      } else {
+        this.message = 'Listening on desktop Chrome or Edge. Voice is not available in Quest Browser. Try “move pawn to e4”.'
+      }
     }
     this.bump()
   }
@@ -696,6 +701,7 @@ export class ChessApplication {
     this.runtime.grab.retarget(session)
     this.sync.retarget(session)
     this.voicePort.retarget(session)
+    this.voice.reset()
     this.listenTo(session)
     this.sync.reconcile()
     this.bump()

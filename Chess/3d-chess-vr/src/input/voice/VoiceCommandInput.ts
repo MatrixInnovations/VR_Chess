@@ -88,6 +88,7 @@ export class VoiceCommandInput implements IInputController {
     this.generation += 1
     this.active = false
     this.consumed = true
+    this.clearPending()
     this.clearSubscription()
     try {
       await this.speech.stop()
@@ -110,6 +111,17 @@ export class VoiceCommandInput implements IInputController {
     return this.active && !this.disposed
   }
 
+  /** Drop a confirmation that belongs to the previous game or phrase. */
+  reset(): void {
+    this.clearPending()
+    this.consumed = false
+  }
+
+  /** Recognizer status, so the UI can tell a denied mic from a missing API. */
+  speechStatus(): 'idle' | 'listening' | 'denied' | 'unsupported' {
+    return this.speech.status()
+  }
+
   /**
    * Submit at most one intent for the current final transcript.
    * Empty audio does nothing. Two or more legal matches ask for an origin and do not submit.
@@ -123,7 +135,7 @@ export class VoiceCommandInput implements IInputController {
     if (!phrase.trim()) return
     // Lock before submit so a listener re-entry cannot file a second intent for this phrase.
     const normalized = phrase.trim().toLowerCase()
-    if (this.pendingIntent && (normalized === 'yes' || normalized === 'confirm' || normalized === 'yeah')) {
+    if (this.pendingIntent && this.isAffirmative(normalized)) {
       const pending = this.pendingIntent
       this.pendingIntent = null
       this.consumed = false
@@ -138,11 +150,10 @@ export class VoiceCommandInput implements IInputController {
       return
     }
     if (this.pendingCandidates && this.pendingCandidates.length > 1) {
-      const origin = normalized.replace(/[^a-h1-8]/g, '')
-      const narrowed = this.pendingCandidates.filter((candidate) => candidate.from === origin)
-      this.pendingCandidates = null
+      const narrowed = this.narrowFollowUp(phrase, this.pendingCandidates)
       this.consumed = false
       if (narrowed.length === 1) {
+        this.pendingCandidates = null
         this.pendingIntent = narrowed[0]
         this.session.requestOriginClarification([narrowed[0]])
         return
@@ -172,6 +183,102 @@ export class VoiceCommandInput implements IInputController {
     this.consumed = false
     this.session.requestOriginClarification([candidates[0]])
   }
+
+  /** Yes, including “Yes.” and “yes please”. */
+  private isAffirmative(phrase: string): boolean {
+    const words = phrase
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length > 0 && !VoiceCommandInput.YES_FILLERS.has(word))
+    if (words.length === 1 && VoiceCommandInput.YES_WORDS.has(words[0])) return true
+    return words.length === 2 && words[0] === 'do' && words[1] === 'it'
+  }
+
+  /**
+   * Resolve a clarification against the moves already on screen.
+   * The follow-up is parsed as chess, then a square or promotion filters that list.
+   */
+  private narrowFollowUp(phrase: string, pending: readonly MoveIntent[]): MoveIntent[] {
+    const legal = pending.map((candidate) => ({
+      from: candidate.from ?? '',
+      to: candidate.to,
+      promotion: candidate.promotion,
+    }))
+    const parsed = this.parser.parse(phrase, legal)
+    if (parsed.length > 0 && parsed.length < pending.length) {
+      return pending.filter((candidate) =>
+        parsed.some(
+          (intent) =>
+            intent.from === candidate.from &&
+            intent.to === candidate.to &&
+            intent.promotion === candidate.promotion,
+        ),
+      )
+    }
+    const squares = this.squaresIn(phrase)
+    if (squares.length > 0) {
+      const fromHit = pending.filter((candidate) => candidate.from && squares.includes(candidate.from))
+      const toHit = pending.filter((candidate) => squares.includes(candidate.to))
+      if (fromHit.length > 0 && fromHit.length < pending.length) return [...fromHit]
+      if (toHit.length > 0 && toHit.length < pending.length) return [...toHit]
+    }
+    const promotion = this.promotionIn(phrase)
+    if (promotion) {
+      const matched = pending.filter((candidate) => candidate.promotion === promotion)
+      if (matched.length > 0 && matched.length < pending.length) return [...matched]
+    }
+    return []
+  }
+
+  /** Squares named in a short follow-up, including file homophones such as “bee one”. */
+  private squaresIn(phrase: string): string[] {
+    const text = phrase
+      .toLowerCase()
+      .replace(/\bthe one\b/g, ' ')
+      .replace(/\b(bee|be)\b/g, 'b')
+      .replace(/\b(see|sea)\b/g, 'c')
+      .replace(/\b(one|won)\b/g, '1')
+      .replace(/\b(two|too|to)\b/g, '2')
+      .replace(/\b(for|fore|four)\b/g, '4')
+      .replace(/\bate\b/g, '8')
+      .replace(/[^a-z0-9\s]/g, ' ')
+    const tokens = text.split(/\s+/).filter((token) => token.length > 0)
+    const squares: string[] = []
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index]
+      const next = tokens[index + 1]
+      if (/^[a-h]$/.test(token) && next && /^[1-8]$/.test(next)) {
+        squares.push(`${token}${next}`)
+        index += 1
+        continue
+      }
+      if (/^[a-h][1-8]$/.test(token)) squares.push(token)
+    }
+    return squares
+  }
+
+  /** Promotion letter from “queen” or “q”. */
+  private promotionIn(phrase: string): MoveIntent['promotion'] | undefined {
+    const words = phrase.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean)
+    for (const word of words) {
+      if (word === 'q' || word === 'queen' || word === 'queens') return 'q'
+      if (word === 'r' || word === 'rook' || word === 'rooks') return 'r'
+      if (word === 'b' || word === 'bishop' || word === 'bishops') return 'b'
+      if (word === 'n' || word === 'knight' || word === 'knights') return 'n'
+    }
+    return undefined
+  }
+
+  /** Forget a move that was waiting for “yes” or a square. */
+  private clearPending(): void {
+    this.pendingIntent = null
+    this.pendingCandidates = null
+  }
+
+  private static readonly YES_WORDS = new Set(['yes', 'yeah', 'yep', 'confirm'])
+
+  private static readonly YES_FILLERS = new Set(['please', 'thanks', 'thank'])
 
   /** Force the voice channel even if a parser double returned another source. */
   private asVoiceIntent(candidate: MoveIntent): MoveIntent {

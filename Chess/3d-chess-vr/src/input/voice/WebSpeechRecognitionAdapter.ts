@@ -56,6 +56,7 @@ interface SpeechGlobal {
 export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
   private recognition: SpeechRecognitionLike | null = null
   private statusKind: SpeechStatus = 'idle'
+  private explicitStop = false
   private finalTranscript = ''
   private readonly listeners = new Set<(transcript: string) => void>()
 
@@ -74,6 +75,7 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
    * A second call while already listening does not open another recognizer.
    */
   async start(): Promise<void> {
+    this.explicitStop = false
     if (this.statusKind === 'listening') return
     if (!this.factory.isSupported()) {
       this.statusKind = 'unsupported'
@@ -91,7 +93,7 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
     }
     this.recognition = recognition
     recognition.lang = this.lang
-    recognition.continuous = false
+    recognition.continuous = true
     // Interims are requested so we can ignore them. Treating a partial as a move would submit early.
     recognition.interimResults = true
 
@@ -111,8 +113,12 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
         finish()
       }
       recognition.onend = () => {
+        const ended = this.recognition
         if (this.statusKind === 'listening') this.statusKind = 'idle'
         finish()
+        if (!this.explicitStop && ended && this.recognition === null && this.factory.isSupported()) {
+          void this.start()
+        }
       }
       recognition.onresult = (event) => {
         this.capture(event)
@@ -132,6 +138,7 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
    * if it consumed the phrase in the same turn. Later events are not delivered.
    */
   async stop(): Promise<void> {
+    this.explicitStop = true
     this.detach()
     if (this.statusKind === 'listening') this.statusKind = 'idle'
   }
@@ -200,8 +207,12 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
 
   /** Permission errors are denial. Everything else, including `no-speech`, is a soft idle. */
   private applyError(error: string): void {
-    if (error === 'not-allowed' || error === 'service-not-allowed') {
+    if (error === 'not-allowed') {
       this.statusKind = 'denied'
+      return
+    }
+    if (error === 'service-not-allowed') {
+      this.statusKind = 'unsupported'
       return
     }
     // A late no-speech after denial must not clear the denied state.

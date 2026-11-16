@@ -9,7 +9,7 @@ A seated 3D chess hall. You play a person across the table, or a person on Liche
 - Sign in to Lichess with OAuth PKCE and seek or challenge a human. The Board API streams the game. Resign, offer or decline a draw, and decline a takeback. No token is stored in the repo.
 - Watch the table clock. Offline, a move switches the running side and adds the increment once. Online, Lichess times replace that estimate and do not add the increment again. A stream event that is still behind your move does not rewind the clock.
 - Drag a piece with the mouse. In a headset, use Quest Touch controllers or a hand pinch.
-- Say “move pawn to e4”. If two pieces can move there, the hall asks which square.
+- On desktop Chrome or Edge, say “move pawn to e4”. If two pieces can move there, the hall asks which square. Quest Browser does not provide speech recognition, so voice is not part of the headset game.
 - Follow the first-run tour. It explains the board, the clock, the menu, voice, and the view switch. It does not block a legal move.
 - Press **3D / Immersive** to enter WebXR, or **Table** for passthrough. The session object and the clock object stay the same.
 

@@ -247,6 +247,7 @@ export class ChessPhraseParser {
     text = text.replace(/[=]/g, ' equals ')
     text = text.replace(/-/g, ' ')
     text = text.replace(/[^a-z0-9\s]/g, ' ')
+    text = text.replace(/\bthe one\b/g, 'the')
     text = text.replace(/\bcastling\b/g, 'castle')
     text = text.replace(/\bking\s+side\b/g, 'kingside')
     text = text.replace(/\bqueen\s+side\b/g, 'queenside')
@@ -431,7 +432,10 @@ export class ChessPhraseParser {
     return query
   }
 
-  /** Drop everything before the last self-correction so a retracted move is not played. */
+  /**
+   * Keep the last clause after a self-correction.
+   * If that clause names no piece, the piece from the retracted clause still applies.
+   */
   private afterCorrection(tokens: string[]): string[] {
     let start = 0
     for (let index = 0; index < tokens.length; index += 1) {
@@ -440,7 +444,14 @@ export class ChessPhraseParser {
         start = index + 1
       }
     }
-    return tokens.slice(start)
+    if (start === 0) return tokens
+    const tail = tokens.slice(start)
+    if (tail.some((token) => ChessPhraseParser.PIECE_WORDS[token])) return tail
+    let piece: string | undefined
+    for (const token of tokens.slice(0, start)) {
+      if (ChessPhraseParser.PIECE_WORDS[token]) piece = token
+    }
+    return piece ? [piece, ...tail] : tail
   }
 
   /** File letter, or a homophone that is only a file when a rank follows. */

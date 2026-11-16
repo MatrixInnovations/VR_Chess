@@ -284,9 +284,10 @@ describe('ChessPhraseParser', () => {
   it('keeps the corrected square and drops the retracted one', () => {
     const legal: LegalMove[] = [
       { from: 'g1', to: 'f3', piece: 'knight' },
+      { from: 'b1', to: 'c3', piece: 'knight' },
       { from: 'c2', to: 'c3', piece: 'pawn' },
     ]
-    expect(parser.parse('knight to f3 actually c3', legal)).toEqual([voice('c2', 'c3')])
+    expect(parser.parse('knight to f3 actually c3', legal)).toEqual([voice('b1', 'c3')])
   })
 
   it('does not treat a destination word with no square as every move of that piece', () => {

@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   experimental: {
     // Fridae's clock lives outside this app so the lane package can keep its own tests.
     externalDir: true,
@@ -23,8 +24,8 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
+              "script-src 'self'",
+              "style-src 'self'",
               "img-src 'self' data: blob:",
               "connect-src 'self' https://lichess.org",
               "worker-src 'self' blob:",

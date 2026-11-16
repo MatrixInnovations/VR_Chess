@@ -30,7 +30,7 @@ export function tourSteps(): readonly ITourStep[] {
     {
       id: 'voice',
       title: 'Say the move',
-      body: 'Press Listen and say “move pawn to e4”. If two pieces can move there, name the square you mean.',
+      body: 'On desktop Chrome or Edge, press Listen and say “move pawn to e4”. Spoken moves are not available in Quest Browser. If two pieces can move there, name the square you mean.',
     },
     {
       id: 'immersive',

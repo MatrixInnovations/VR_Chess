@@ -366,6 +366,69 @@ describe('VoiceCommandInput confirmation', () => {
     speech.emit('yes')
     expect(session.submitMoveIntent).toHaveBeenCalledWith({ from: 'b1', to: 'c3', source: 'voice' })
   })
+
+  it('forgets a pending yes after stop, and accepts a polite yes', async () => {
+    const speech = new FakeSpeech()
+    const session = createSession([{ from: 'e2', to: 'e4' }])
+    const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
+    await input.start()
+    speech.emit('pawn to e4')
+    await input.stop()
+    input.reset()
+    speech.finalText = ''
+    await input.start()
+    speech.emit('yes')
+    expect(session.submitMoveIntent).not.toHaveBeenCalled()
+    speech.emit('pawn to e4')
+    speech.emit('Yes.')
+    expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
+    speech.emit('pawn to e4')
+    speech.emit('yes please')
+    expect(session.submitMoveIntent).toHaveBeenCalledTimes(2)
+  })
+
+  it('answers a clarification with a homophone, a from-square, a promotion, or a castle wing', async () => {
+    const speech = new FakeSpeech()
+    const knights = createSession([
+      { from: 'b1', to: 'a3' },
+      { from: 'b1', to: 'c3' },
+      { from: 'g1', to: 'f3' },
+    ])
+    const knightInput = new VoiceCommandInput(speech, new ChessPhraseParser(), knights)
+    await knightInput.start()
+    speech.emit('knight')
+    speech.emit('from b1')
+    speech.emit('yes')
+    expect(knights.submitMoveIntent).not.toHaveBeenCalled()
+    speech.emit('bee one')
+    speech.emit('c3')
+    speech.emit('yes please')
+    expect(knights.submitMoveIntent).toHaveBeenCalledWith({ from: 'b1', to: 'c3', source: 'voice' })
+
+    const promoSpeech = new FakeSpeech()
+    const promo = createSession([
+      { from: 'e7', to: 'e8', promotion: 'q' },
+      { from: 'e7', to: 'e8', promotion: 'n' },
+    ])
+    const promoInput = new VoiceCommandInput(promoSpeech, new ChessPhraseParser(), promo)
+    await promoInput.start()
+    promoSpeech.emit('pawn to e8')
+    promoSpeech.emit('queen')
+    promoSpeech.emit('yes')
+    expect(promo.submitMoveIntent).toHaveBeenCalledWith({ from: 'e7', to: 'e8', promotion: 'q', source: 'voice' })
+
+    const castleSpeech = new FakeSpeech()
+    const castle = createSession([
+      { from: 'e1', to: 'g1' },
+      { from: 'e1', to: 'c1' },
+    ])
+    const castleInput = new VoiceCommandInput(castleSpeech, new ChessPhraseParser(), castle)
+    await castleInput.start()
+    castleSpeech.emit('castle')
+    castleSpeech.emit('g1')
+    castleSpeech.emit('yes')
+    expect(castle.submitMoveIntent).toHaveBeenCalledWith({ from: 'e1', to: 'g1', source: 'voice' })
+  })
 })
 
 describe('VoiceCommandInput session boundary', () => {

@@ -82,7 +82,7 @@ describe('WebSpeechRecognitionAdapter', () => {
     const recognition = factory.created[0]
     expect(adapter.status()).toBe('listening')
     expect(recognition.lang).toBe('en-US')
-    expect(recognition.continuous).toBe(false)
+    expect(recognition.continuous).toBe(true)
     expect(recognition.interimResults).toBe(true)
     expect(factory.created).toHaveLength(1)
   })
@@ -134,7 +134,7 @@ describe('WebSpeechRecognitionAdapter', () => {
       return recognition
     }
     await serviceAdapter.start()
-    expect(serviceAdapter.status()).toBe('denied')
+    expect(serviceAdapter.status()).toBe('unsupported')
   })
 
   it('soft-fails to idle on no-speech, network, audio-capture, aborted, and unknown errors', async () => {
