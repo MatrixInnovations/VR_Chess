@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
+import { clockFaceClass, clockIsLow, clockNote, formatClockMs } from './clockHud'
 
 const face = (overrides: Partial<Parameters<typeof clockFaceClass>[0]> = {}) => ({
   isActive: false,
@@ -17,6 +17,10 @@ describe('clock HUD cues', () => {
     expect(clockFaceClass(low)).toContain('hall-clock-low')
     expect(clockNote(low)).toBe(' · low')
     expect(clockFaceClass(face({ isActive: true, remainingMs: 30_001 }))).not.toContain('hall-clock-low')
+    expect(clockIsLow(face({ isActive: true, remainingMs: 0 }))).toBe(true)
+    expect(clockFaceClass(face({ isActive: true, remainingMs: 0 }))).toContain('hall-clock-low')
+    expect(clockIsLow(face({ isActive: false, remainingMs: 0 }))).toBe(false)
+    expect(clockNote(face({ isActive: true, remainingMs: 0 }))).toBe(' · low')
   })
 
   it('keeps a provisional zero distinct from a confirmed flag', () => {

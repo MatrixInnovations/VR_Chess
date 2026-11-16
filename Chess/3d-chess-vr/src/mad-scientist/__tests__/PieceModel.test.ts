@@ -53,7 +53,7 @@ describe('PieceMaterialSet', () => {
     expect(black.metalness).toBe(1)
     expect(white.roughness).toBeCloseTo(0.08)
     expect(black.roughness).toBeCloseTo(0.12)
-    expect(black.envMapIntensity).toBeCloseTo(1.35)
+    expect(black.envMapIntensity).toBeCloseTo(1.15)
     expect(white.color.getHex()).toBe(0xd4d7dc)
     expect(black.color.getHex()).toBe(0xc06a38)
     expect(white.roughnessMap).toBeTruthy()
@@ -107,6 +107,17 @@ describe('PieceModel', () => {
     expect(pawn.object.position.x).toBeCloseTo(home.x)
     expect(pawn.object.position.z).toBeCloseTo(home.z)
     expect(pawn.getSquare()).toEqual(whitePawn().square)
+
+    const queenside = new PieceModel(whitePawn({ id: 'wq', kind: 'knight', square: { file: 1, rank: 0 } }), materials, board)
+    const kingside = new PieceModel(whitePawn({ id: 'wk', kind: 'knight', square: { file: 6, rank: 0 } }), materials, board)
+    const black = new PieceModel(
+      whitePawn({ id: 'bq', kind: 'knight', color: 'black', square: { file: 1, rank: 7 } }),
+      materials,
+      board,
+    )
+    expect(queenside.object.children[0].rotation.y).toBeCloseTo(Math.PI / 2 - 0.65)
+    expect(kingside.object.children[0].rotation.y).toBeCloseTo(Math.PI / 2 + 0.65)
+    expect(black.object.children[0].rotation.y).toBeCloseTo(-(Math.PI / 2 - 0.65))
   })
 
   it('previews in the air without changing the logical square, then snaps back', () => {

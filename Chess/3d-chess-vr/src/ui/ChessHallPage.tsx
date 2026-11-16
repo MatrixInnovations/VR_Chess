@@ -1,5 +1,5 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
-import { PCFShadowMap, type WebGLRenderer } from 'three'
+import { PCFShadowMap, Vector3, type WebGLRenderer } from 'three'
 import { configureHallStage } from '../mad-scientist/hall/HallStage'
 import { XR, XROrigin, useXR } from '@react-three/xr'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type RefObject } from 'react'
@@ -9,10 +9,12 @@ import { ChessApplication, type PointerSurface } from '../app/ChessApplication'
 import { readXrPoses, type LooseXrInput, type XrFrameLike } from '../app/XrInputPump'
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
-import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
+import { BOARD_SURFACE_Y, SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
 import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
-import { publishFrameSample } from './frameSample'
+import { publishFrameSample, readCenterProbe, type FrameProbe } from './frameSample'
 import { SiteCredit } from './SiteCredit'
+
+const boardProbePoint = new Vector3()
 
 /**
  * Props for {@link ChessHallPage}. Tests pass an application. The route boots one.
@@ -215,7 +217,12 @@ function HallTicker({ model }: { model: ChessApplication }): null {
   const wasAnimating = useRef(false)
   const wasGrabbing = useRef(false)
   const shadowGeneration = useRef(-1)
+  const flags = useRef<{ probe: boolean; norender: boolean } | null>(null)
   useFrame((state) => {
+    if (!flags.current && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      flags.current = { probe: params.get('probe') === '1', norender: params.get('norender') === '1' }
+    }
     model.frame()
     const animating = model.runtime.animator.isAnimating()
     const grabbing = model.runtime.grab.isGrabbing()
@@ -230,15 +237,27 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     wasGrabbing.current = grabbing
     shadowGeneration.current = generation
     if (dirty && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
+    const presenting = Boolean(state.gl.xr?.isPresenting)
     const orbit = model.runtime.hall.orbit
     if (orbit) {
-      orbit.enabled = !grabbing
-      if (!grabbing) orbit.update()
+      if (presenting) orbit.enabled = false
+      else {
+        orbit.enabled = !grabbing
+        if (!grabbing) orbit.update()
+      }
     }
     const grade = model.runtime.hall.grade
-    if (grade) grade.render()
-    else if (typeof state.gl.render === 'function') state.gl.render(state.scene, state.camera)
-    publishFrameSample(state.gl)
+    if (!flags.current?.norender) {
+      if (grade) grade.render()
+      else if (typeof state.gl.render === 'function') state.gl.render(state.scene, state.camera)
+    }
+    if (flags.current?.probe) {
+      boardProbePoint.set(0, BOARD_SURFACE_Y, 0)
+      boardProbePoint.project(state.camera)
+      const sample = readCenterProbe(state.gl, { x: boardProbePoint.x, y: boardProbePoint.y })
+      if (sample) (window as Window & { __CHESS_FRAME_PROBE__?: FrameProbe }).__CHESS_FRAME_PROBE__ = sample
+    }
+    publishFrameSample(state.gl, presenting)
   }, 1)
   return null
 }

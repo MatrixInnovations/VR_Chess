@@ -10,6 +10,7 @@ import {
 
 import type { ClockFaceExpiry, IClockFaceSnapshot, IClockSideFace } from '../mad-scientist/hall/ClockViewMirror'
 import { ClockMaterials } from '../mad-scientist/hall/ClockMaterials'
+import { clockIsLow } from '../ui/clockHud'
 
 const FACE_INK: Record<ClockFaceExpiry, { background: string; digit: string }> = {
   running: { background: '#141210', digit: '#f3efe6' },
@@ -102,7 +103,7 @@ export class PhysicalChessClock {
 
   private paint(mesh: Mesh, face: IClockSideFace, side: 'white' | 'black'): void {
     const paint = this.faces[side]
-    const low = face.expiry === 'running' && face.isActive && (face.remainingMs ?? 0) > 0 && (face.remainingMs ?? 0) <= 30_000
+    const low = clockIsLow(face)
     const signature = `${face.label}|${face.expiry}|${low ? 'low' : ''}`
     mesh.userData.clockLabel = face.label
     mesh.userData.clockSide = side
@@ -142,14 +143,24 @@ export class PhysicalChessClock {
     const ink = FACE_INK[expiry]
     context.fillStyle = ink.background
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
-    context.fillStyle = low ? '#e7b48a' : ink.digit
+    if (expiry === 'confirmed-flag' || expiry === 'offline-local-flag') {
+      context.strokeStyle = '#ff4d4d'
+      context.lineWidth = 10
+      context.strokeRect(6, 6, paint.canvas.width - 12, paint.canvas.height - 12)
+      context.fillStyle = '#ff4d4d'
+      context.font = 'bold 28px Georgia, serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('FLAG', paint.canvas.width / 2, 24)
+    }
+    context.fillStyle = low ? '#ffd8b0' : ink.digit
     context.font = 'bold 72px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2)
     if (low) {
-      context.fillStyle = '#c06a38'
-      context.fillRect(18, paint.canvas.height - 14, paint.canvas.width - 36, 6)
+      context.fillStyle = '#ffc9a0'
+      context.fillRect(18, paint.canvas.height - 16, paint.canvas.width - 36, 10)
     }
     if (!paint.texture) {
       paint.texture = new CanvasTexture(paint.canvas)

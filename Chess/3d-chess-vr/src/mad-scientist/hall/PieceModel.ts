@@ -82,6 +82,16 @@ export class PieceModel {
   snapToSquare(square: Square): void {
     this.square = { file: square.file, rank: square.rank }
     this.object.position.copy(this.board.worldPosition(this.square))
+    this.aimKnight()
+  }
+
+  /** Both knights on a side turn inward, toward the middle of the board. */
+  private aimKnight(): void {
+    if (this.kind !== 'knight') return
+    const mesh = this.owned[0]
+    if (!mesh) return
+    const inward = this.square.file < 3.5 ? -0.65 : 0.65
+    mesh.rotation.y = this.color === 'white' ? Math.PI / 2 + inward : -(Math.PI / 2 + inward)
   }
 
   /**
@@ -96,7 +106,6 @@ export class PieceModel {
   private build(kind: PieceKind): void {
     const geometry = pieceGeometry(kind)
     const mesh = new Mesh(geometry, this.materials.get(this.color, 'idle'))
-    if (kind === 'knight') mesh.rotation.y = this.color === 'white' ? Math.PI / 2 - 0.65 : -(Math.PI / 2 + 0.65)
     if (kind === 'bishop') mesh.rotation.y = -Math.PI / 2 - 0.4
     mesh.castShadow = true
     mesh.userData.msRole = 'piece'

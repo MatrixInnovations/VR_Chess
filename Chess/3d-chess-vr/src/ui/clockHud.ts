@@ -7,6 +7,21 @@ export interface ClockHudFace {
   blank?: boolean
 }
 
+/**
+ * A running clock on the side to move is low at 30 seconds and at zero.
+ * The other side never takes the cue, and a flag is not a low-time warning.
+ * @param face - Active flag, expiry, and published remaining time.
+ * @returns True when the low-time treatment should show.
+ */
+export function clockIsLow(face: {
+  isActive: boolean
+  expiry: string
+  remainingMs: number | null
+}): boolean {
+  if (!face.isActive || face.expiry !== 'running') return false
+  return (face.remainingMs ?? 0) <= 30_000
+}
+
 /** Classes for the side-to-move, low-time, provisional, and flag treatments. */
 export function clockFaceClass(face: ClockHudFace): string {
   const names = ['hall-clock']
@@ -14,9 +29,7 @@ export function clockFaceClass(face: ClockHudFace): string {
   if (face.isActive) names.push('hall-clock-active')
   if (face.expiry === 'provisional-expired') names.push('hall-clock-provisional')
   if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') names.push('hall-clock-flag')
-  if (face.expiry === 'running' && face.isActive && face.remainingMs > 0 && face.remainingMs <= 30_000) {
-    names.push('hall-clock-low')
-  }
+  if (clockIsLow(face)) names.push('hall-clock-low')
   return names.join(' ')
 }
 
@@ -25,7 +38,7 @@ export function clockNote(face: ClockHudFace): string {
   if (face.blank || face.expiry === 'no-clock') return ''
   if (face.expiry === 'provisional-expired') return ' · provisional'
   if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') return ' · flag'
-  if (face.expiry === 'running' && face.isActive && face.remainingMs > 0 && face.remainingMs <= 30_000) return ' · low'
+  if (clockIsLow(face)) return ' · low'
   return ''
 }
 

@@ -1,7 +1,5 @@
 import { expect, type Page } from '@playwright/test'
 
-import { pngStats } from './pngStats'
-
 /** The canvas has left the 300×150 default and a real frame has been drawn. */
 export async function waitForHallCanvas(page: Page): Promise<void> {
   const canvas = page.locator('.hall-stage canvas')
@@ -15,11 +13,15 @@ export async function waitForHallCanvas(page: Page): Promise<void> {
   await expect.poll(async () => canvas.getAttribute('data-frame'), { timeout: 60_000 }).toBe('1')
 }
 
-/** Screenshot the canvas until the board is actually painted. */
-export async function expectPaintedCanvas(page: Page): Promise<void> {
-  const canvas = page.locator('.hall-stage canvas')
+/**
+ * The center of the WebGL buffer, read immediately after render.
+ * A screenshot of the canvas element also includes the HUD, so it can pass with nothing drawn.
+ */
+export async function expectProbePainted(page: Page): Promise<void> {
   await expect.poll(async () => {
-    const sample = pngStats(await canvas.screenshot())
-    return sample.mean > 12 && sample.variance > 4
+    return page.evaluate(() => {
+      const probe = (window as unknown as { __CHESS_FRAME_PROBE__?: { mean: number; variance: number } }).__CHESS_FRAME_PROBE__
+      return Boolean(probe && probe.mean > 12 && probe.variance > 4)
+    })
   }, { timeout: 60_000 }).toBe(true)
 }

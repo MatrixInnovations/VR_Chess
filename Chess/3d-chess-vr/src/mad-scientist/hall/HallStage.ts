@@ -21,6 +21,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 
 import { createBoardReflector } from './BoardReflector'
+import { bakeMarbleGpu } from './MarbleVeins'
 import { buildEnvironment, darkHallEnvScene } from './HallEnvironment'
 import type { ChessHall } from './ChessHall'
 import { BOARD_SURFACE_Y } from './metrics'
@@ -92,13 +93,14 @@ export function configureHallStage(
       hall.materials.setMirrorBlend(true)
       const composer = new EffectComposer(gl)
       composer.addPass(new RenderPass(scene, camera))
-      composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.95))
+      composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.97))
       const css = new Vector2()
       if (typeof gl.getSize === 'function') gl.getSize(css)
       if (css.x > 0 && css.y > 0) composer.setSize(css.x, css.y)
       hall.grade = composer
     }
   }
+  bakeMarbleGpu(gl, hall.materials, quest)
   const starter = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
   scene.environment = starter
   if (typeof gl.compile === 'function') gl.compile(scene, camera)
@@ -132,7 +134,7 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
     (hdr) => {
       hdr.mapping = UVMapping
       const room = new Scene()
-      const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, side: BackSide }))
+      const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, color: 0x404040, side: BackSide }))
       sphere.rotation.y = 0.35
       room.add(sphere)
       replaceEnvironment(scene, buildEnvironment(gl, room, bake))

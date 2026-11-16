@@ -10,8 +10,9 @@ import { createBoardReflector } from '../hall/BoardReflector'
 import { buildEnvironment, darkHallEnvScene } from '../hall/HallEnvironment'
 import { KING_HEIGHT_M } from '../hall/metrics'
 import { coordinateBorderTexture, paintCoordinateGlyphs } from '../hall/MarbleTexture'
-import { applyMarbleVeins, stampTileSeed } from '../hall/MarbleVeins'
+import { applyMarbleVeins, bakeMarbleGpu, stampTileSeed } from '../hall/MarbleVeins'
 import { carveMitreSlit, disposePieceGeometries, pieceGeometry } from '../hall/PieceGeometryCache'
+import { PieceMaterialSet } from '../hall/PieceMaterialSet'
 import { LATHE_SEGMENTS, PROFILE } from '../hall/PieceProfiles'
 
 describe('marble veins', () => {
@@ -37,6 +38,30 @@ describe('marble veins', () => {
     expect(material.customProgramCacheKey()).toBe('marble-light')
     geometry.dispose()
     material.dispose()
+  })
+
+  it('draws the vein recipe into render targets when the renderer can draw', () => {
+    const materials = new PieceMaterialSet()
+    const before = materials.boardSquare('light').map
+    bakeMarbleGpu({} as WebGLRenderer, materials, false)
+    expect(materials.boardSquare('light').map).toBe(before)
+    let draws = 0
+    const gl = {
+      outputEncoding: 3001,
+      getRenderTarget: () => null,
+      setRenderTarget() {
+        draws += 1
+      },
+      render() {
+        draws += 1
+      },
+    }
+    bakeMarbleGpu(gl as unknown as WebGLRenderer, materials, false)
+    bakeMarbleGpu(gl as unknown as WebGLRenderer, materials, true)
+    expect(draws).toBeGreaterThan(4)
+    expect(materials.boardSquare('light').map).not.toBe(before)
+    expect(materials.floorWood().map).not.toBe(before)
+    materials.dispose()
   })
 })
 
@@ -187,13 +212,13 @@ describe('hall stage', () => {
       },
       bake: () => ({ texture: environment }),
     })
-    expect(hall.camera.fov).toBe(38)
-    expect(hall.camera.position.z).toBeCloseTo(0.84)
+    expect(hall.camera.fov).toBe(36)
+    expect(hall.camera.position.z).toBeCloseTo(0.66)
     expect(hall.reflector).toBeTruthy()
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
     expect(bloom.strength).toBeCloseTo(0.15)
-    expect(bloom.threshold).toBeCloseTo(0.95)
+    expect(bloom.threshold).toBeCloseTo(0.97)
     expect((gl as { toneMapping?: number }).toneMapping).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)
@@ -283,7 +308,7 @@ describe('desktop stage without the mirror', () => {
     })
     expect(hall.reflector).toBeNull()
     expect(hall.grade).toBeNull()
-    expect(hall.camera.fov).toBe(38)
+    expect(hall.camera.fov).toBe(36)
     expect(hall.orbit).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)

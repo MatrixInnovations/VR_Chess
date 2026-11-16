@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { expectPaintedCanvas, waitForHallCanvas } from './hallCanvas'
+import { expectProbePainted, waitForHallCanvas } from './hallCanvas'
 
 async function waitForNextFrame(page: Page): Promise<void> {
   const before = await page.locator('canvas').getAttribute('data-frames')
@@ -8,7 +8,7 @@ async function waitForNextFrame(page: Page): Promise<void> {
 }
 
 test('pass and play moves the clock and the immersive switch keeps the session', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?probe=1')
   await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
   await waitForHallCanvas(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/hall-seated.png', fullPage: false })
@@ -45,5 +45,5 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await page.screenshot({ path: '/opt/cursor/artifacts/immersive-toggle.png', fullPage: false })
   await expect(page.getByTestId('session-id')).toHaveText(before)
   await expect(page.getByTestId('clock-active')).toHaveText('black')
-  await expectPaintedCanvas(page)
+  await expectProbePainted(page)
 })

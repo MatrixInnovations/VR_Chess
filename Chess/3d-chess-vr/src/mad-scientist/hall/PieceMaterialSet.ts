@@ -7,6 +7,7 @@ import {
   Texture,
 } from 'three'
 
+import type { BakedMarbleMaps } from './MarbleVeins'
 import { bakeMarble, contactFalloffTexture, coordinateBorderTexture, marbleBakeSize, scratchMaps } from './MarbleTexture'
 
 import type { PieceColor, PieceFinish } from '../contracts/types'
@@ -64,6 +65,8 @@ export class PieceMaterialSet {
 
   private contactMaterial: MeshBasicMaterial | null = null
 
+  private bakeTargets: { dispose(): void }[] = []
+
   private scratch!: { roughness: Texture; normal: Texture }
 
   /**
@@ -97,15 +100,15 @@ export class PieceMaterialSet {
     this.scratch = scratch
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 1, 0.08, 0.06, 1.8))
-    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.1, 0.08, 1.35))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 1.8))
-    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.35))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 0.7, 0.08, 0.06, 1.8))
-    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.1, 0.08, 1.35))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 1, 0.08, 0.06, 1.5))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.06, 0.08, 1.15))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 1.5))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.06, 0.08, 1.15))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 0.7, 0.08, 0.06, 1.5))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.06, 0.08, 1.15))
 
-    this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 1.15))
-    this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 1.45))
+    this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4))
+    this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 0.15))
     this.put('board:frame', this.marble(floorTile, 0.13, 0.2, 0.18, 0.4))
     this.put(
       'board:highlight',
@@ -147,9 +150,9 @@ export class PieceMaterialSet {
     )
 
     this.put('room:floor', this.marble(floorTile, 0.5, 0.15, 0.22, 0.35))
-    this.put('room:table', this.marble(floorTile, 0.45, 0.2, 0.22, 0.4))
-    this.put('room:wall', this.marble(wallTile, 0.62, 0.08, 0.3, 0.3))
-    this.put('room:plaster', this.marble(wallTile, 0.62, 0.08, 0.3, 0.3))
+    this.put('room:table', this.marble(floorTile, 0.45, 0.2, 0.22, 0.12))
+    this.put('room:wall', this.marble(wallTile, 0.62, 0.08, 0.3, 0.45))
+    this.put('room:plaster', this.marble(wallTile, 0.62, 0.08, 0.3, 0.45))
     this.put('room:ceiling', this.make({ color: 0x0c0b0a, roughness: 0.7, metalness: 0, clearcoat: 0.05, clearcoatRoughness: 0.6, envMapIntensity: 0.4 }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
     this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35 }))
@@ -282,13 +285,36 @@ export class PieceMaterialSet {
   setMirrorBlend(enabled: boolean): void {
     const light = this.boardSquare('light')
     const dark = this.boardSquare('dark')
-    const opacity = enabled ? 0.94 : 1
-    light.opacity = opacity
-    dark.opacity = opacity
+    light.opacity = enabled ? 0.82 : 1
+    dark.opacity = enabled ? 0.7 : 1
     light.transparent = enabled
     dark.transparent = enabled
     light.depthWrite = !enabled
     dark.depthWrite = !enabled
+  }
+
+  /** Swap the placeholder marble maps for the GPU bake. Shared slabs keep their repeat. */
+  installBakedMarble(baked: BakedMarbleMaps): void {
+    const previous = new Set<Texture>()
+    const assign = (key: string, texture: Texture) => {
+      const material = this.table.get(key) as MeshStandardMaterial
+      if (material.map && material.map !== texture) previous.add(material.map)
+      material.map = texture
+      material.needsUpdate = true
+    }
+    assign('board:light', baked.light)
+    assign('board:dark', baked.dark)
+    assign('board:frame', baked.floor)
+    assign('room:floor', baked.floor)
+    assign('room:table', baked.floor)
+    assign('room:wall', baked.wall)
+    assign('room:plaster', baked.wall)
+    for (const texture of previous) {
+      texture.dispose()
+      const index = this.textures.indexOf(texture)
+      if (index >= 0) this.textures.splice(index, 1)
+    }
+    this.bakeTargets = baked.targets
   }
 
   /**
@@ -330,6 +356,8 @@ export class PieceMaterialSet {
   /** Dispose the shared materials and the marble maps. Call once, when the hall is torn down. */
   dispose(): void {
     for (const material of this.table.values()) material.dispose()
+    for (const target of this.bakeTargets) target.dispose()
+    this.bakeTargets = []
     this.contactMaterial?.dispose()
     for (const texture of this.textures) texture.dispose()
     this.table.clear()

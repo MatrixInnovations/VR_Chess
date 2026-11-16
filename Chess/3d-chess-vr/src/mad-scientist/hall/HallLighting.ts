@@ -58,9 +58,9 @@ export class HallLighting {
     shadowCamera.updateProjectionMatrix()
     this.key.target.position.set(0, BOARD_SURFACE_Y, 0)
 
-    this.fill = new DirectionalLight(0xffd8b8, 0.22)
+    this.fill = new DirectionalLight(0xffd8b8, 0.1)
     this.fill.name = 'fill'
-    this.fill.position.set(-0.55, 1.55, 0.7)
+    this.fill.position.set(-0.9, 1.6, -0.3)
     this.fill.target.position.set(0, BOARD_SURFACE_Y, 0)
 
     this.rim = new DirectionalLight(0xffd4a0, 0.45)
@@ -117,7 +117,7 @@ export class HallLighting {
     camera.top = span
     camera.bottom = -span
     camera.updateProjectionMatrix()
-    this.rect.intensity = desktop ? 0.7 : 0
+    this.rect.intensity = desktop ? 0.4 : 0
     this.rect.visible = desktop
     if (desktop) this.object.add(this.rect)
     else this.rect.removeFromParent()

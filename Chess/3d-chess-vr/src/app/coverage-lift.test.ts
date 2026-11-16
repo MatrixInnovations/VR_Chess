@@ -83,11 +83,14 @@ describe('PhysicalChessClock', () => {
   it('reuses one texture when the label changes and skips a repeat', () => {
     const context = {
       fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
       font: '',
       textAlign: '',
       textBaseline: '',
       fillRect: () => undefined,
       fillText: () => undefined,
+      strokeRect: () => undefined,
     }
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D)
     const clock = new PhysicalChessClock()

@@ -27,7 +27,7 @@ export function knightShape(): Shape {
 /** Extruded, bevelled horse head with a narrowed muzzle and cheek swell. */
 export function buildKnightHead(): ExtrudeGeometry {
   const geometry = new ExtrudeGeometry(knightShape(), {
-    depth: 0.009,
+    depth: 0.016,
     steps: 1,
     curveSegments: 8,
     bevelEnabled: true,
@@ -36,7 +36,7 @@ export function buildKnightHead(): ExtrudeGeometry {
     bevelOffset: 0,
     bevelSegments: 3,
   })
-  geometry.translate(0, 0, -0.0045)
+  geometry.translate(0, 0, -0.008)
   shapeKnight(geometry)
   return geometry
 }
@@ -50,7 +50,7 @@ function shapeKnight(geometry: ExtrudeGeometry): void {
     const muzzle = Math.max(0, (x - 0.006) / 0.0108)
     const cheek = Math.exp(-((x - 0.002) ** 2 + (y - 0.044) ** 2) / 4e-5)
     const neck = y < 0.03 ? 1 + 0.15 * (1 - y / 0.03) : 1
-    position.setZ(index, z * (1 - 0.38 * muzzle) * (1 + 0.18 * cheek) * neck)
+    position.setZ(index, z * (1 - 0.55 * muzzle) * (1 + 0.22 * cheek) * neck)
   }
   position.needsUpdate = true
   geometry.computeVertexNormals()

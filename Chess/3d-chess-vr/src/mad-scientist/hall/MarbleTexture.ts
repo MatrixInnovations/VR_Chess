@@ -1,4 +1,13 @@
-import { CanvasTexture, DataTexture, RGBAFormat, RepeatWrapping, sRGBEncoding, Texture } from 'three'
+import {
+  CanvasTexture,
+  DataTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RGBAFormat,
+  RepeatWrapping,
+  sRGBEncoding,
+  Texture,
+} from 'three'
 
 /**
  * Runtime marble. Pixel data only, so the page does not fetch an image
@@ -115,6 +124,10 @@ function publish(data: Uint8Array, size: number): DataTexture {
   const texture = new DataTexture(data, size, size, RGBAFormat)
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
+  texture.magFilter = LinearFilter
+  texture.minFilter = LinearMipmapLinearFilter
+  texture.generateMipmaps = true
+  texture.anisotropy = 8
   texture.encoding = sRGBEncoding
   texture.flipY = false
   texture.premultiplyAlpha = false
@@ -234,11 +247,13 @@ export function scratchMaps(): { roughness: DataTexture; normal: DataTexture } {
 /** Keeps the texture type in the public signature without importing it twice. */
 export type MarbleMap = Texture
 
-/** 2048 on desktop, 1024 on Quest, tiny under Vitest so the suite stays fast. */
+/**
+ * Placeholder size for the constructor.
+ * The browser replaces these with a GPU render-target bake. Tests keep a small CPU map.
+ */
 export function marbleBakeSize(): number {
   if (typeof process !== 'undefined' && process.env.VITEST) return 64
-  if (typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)) return 1024
-  return 2048
+  return 8
 }
 
 /** Inputs for one baked marble albedo. */
@@ -256,7 +271,7 @@ export interface MarbleBakeOptions {
 export function bakeMarble(options: MarbleBakeOptions): DataTexture {
   const { size, dark, veinMix, cells } = options
   const base = options.base ?? (dark ? [11, 11, 12] : [240, 235, 227])
-  const vein = dark ? [74, 69, 62] : [110, 106, 100]
+  const vein = dark ? [201, 164, 76] : [198, 194, 186]
   const data = new Uint8Array(size * size * 4)
   const cell = size / cells
   for (let y = 0; y < size; y += 1) {
@@ -296,10 +311,10 @@ function veinAmount(u: number, v: number, seed: number): number {
   const q2 = fbm(rx * 2.4 + 19.2, ry * 2.4 + 19.2)
   const wx = rx + 0.22 * q
   const wy = ry + 0.22 * q2
-  const ridged = 1 - Math.abs(noiseSigned(wx * 3.6 + seed, wy * 3.6 + seed))
-  let vein = smoothstep(0.72, 0.98, ridged) ** 1.8
-  const hair = 1 - Math.abs(noiseSigned(wx * 7.2, wy * 7.2))
-  vein += 0.18 * smoothstep(0.8, 0.98, hair) ** 2.2
+  const ridged = 1 - Math.abs(noiseSigned(wx * 6.4 + seed, wy * 6.4 + seed))
+  let vein = smoothstep(0.86, 0.995, ridged) ** 2.4
+  const hair = 1 - Math.abs(noiseSigned(wx * 12.8, wy * 12.8))
+  vein += 0.1 * smoothstep(0.9, 0.995, hair) ** 2.6
   return vein
 }
 
