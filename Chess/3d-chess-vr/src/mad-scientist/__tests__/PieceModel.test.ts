@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Group } from 'three'
+import { Group, MeshPhysicalMaterial } from 'three'
 
 import type { PieceKind } from '../contracts/types'
 import { BoardModel } from '../hall/BoardModel'
@@ -26,37 +26,51 @@ describe('PieceMaterialSet', () => {
     expect(dragging.opacity).toBeLessThan(1)
   })
 
-  it('uses felt and wood board finishes and keeps the Quest material budget honest', () => {
+  it('uses marble and metal finishes and keeps the Quest material budget shared', () => {
     const set = new PieceMaterialSet()
-    const felt = set.boardSquare('light')
-    const wood = set.boardSquare('dark')
+    const cream = set.boardSquare('light')
+    const marble = set.boardSquare('dark')
     const white = set.get('white', 'idle')
     const black = set.get('black', 'idle')
     const budget = set.gpuBudget()
 
-    expect(felt).not.toBe(wood)
-    expect(felt.color.getHex()).toBeGreaterThan(wood.color.getHex())
-    expect(felt.roughness).toBeGreaterThan(0.85)
-    expect(wood.roughness).toBeGreaterThan(0.4)
-    expect(wood.roughness).toBeLessThan(0.8)
-    expect(white.roughness).not.toBeCloseTo(black.roughness, 1)
-    expect(Math.abs(white.roughness - black.roughness)).toBeGreaterThan(0.15)
-    expect(white.metalness).toBeLessThan(0.2)
-    expect(black.metalness).toBeLessThan(0.25)
-    expect(budget.textureCount).toBe(0)
-    felt.map = {} as typeof felt.map
-    expect(set.gpuBudget().textureCount).toBe(1)
-    felt.map = null
-    expect(set.gpuBudget().textureCount).toBe(0)
-    expect(budget.materialCount).toBeLessThanOrEqual(16)
+    const creamCoat = cream as MeshPhysicalMaterial
+    const marbleCoat = marble as MeshPhysicalMaterial
+    expect(cream).not.toBe(marble)
+    expect(cream.color.getHex()).toBe(0xf0ebe3)
+    expect(marble.color.getHex()).toBe(0x0b0b0c)
+    expect(cream.metalness).toBe(0)
+    expect(marble.metalness).toBe(0)
+    expect(cream.roughness).toBeCloseTo(0.16)
+    expect(marble.roughness).toBeCloseTo(0.12)
+    expect(creamCoat.clearcoat).toBeCloseTo(0.95)
+    expect(marbleCoat.clearcoat).toBe(1)
+    expect(white.metalness).toBe(1)
+    expect(black.metalness).toBe(1)
+    expect(white.roughness).toBeCloseTo(0.08)
+    expect(black.roughness).toBeCloseTo(0.14)
+    expect(white.color.getHex()).toBe(0xd4d7dc)
+    expect(black.color.getHex()).toBe(0xc06a38)
+    expect(white.roughnessMap).toBeTruthy()
+    expect(white.roughnessMap).toBe(black.roughnessMap)
+    expect(white.normalMap).toBe(black.normalMap)
+    expect(set.gold().color.getHex()).toBe(0xc9a44c)
+    expect(set.felt().roughness).toBeCloseTo(0.95)
+    expect(set.felt().metalness).toBe(0)
+    const before = budget.textureCount
+    expect(before).toBeGreaterThan(0)
+    expect(before).toBeLessThanOrEqual(48)
+    const saved = white.roughnessMap
+    white.roughnessMap = null
+    expect(set.gpuBudget().textureCount).toBe(before - 1)
+    white.roughnessMap = saved
+    expect(set.gpuBudget().textureCount).toBe(before)
+    expect(budget.materialCount).toBeLessThanOrEqual(24)
     expect(budget.materialCount).toBeGreaterThan(6)
     expect(PerformanceBudget.QUEST_PRO_FLOOR_FPS).toBe(72)
     expect(PerformanceBudget.QUEST_PRO_TARGET_FPS).toBe(90)
-    for (const material of [felt, wood, white, black, set.boardFrame(), set.highlightMaterial()]) {
-      expect(material.map).toBeNull()
-      expect(material.normalMap).toBeNull()
-      expect(material.roughnessMap).toBeNull()
-    }
+    expect(white.map).toBeNull()
+    expect(black.normalMap).toBeTruthy()
   })
 })
 
@@ -119,10 +133,15 @@ describe('PieceModel', () => {
     ).toThrow(/dragon/)
 
     const pawn = new PieceModel(whitePawn(), materials, board)
+    const geometry = pawn.meshes()[0].geometry
+    const again = new PieceModel(whitePawn({ id: 'second' }), materials, board)
+    expect(again.meshes()[0].geometry).toBe(geometry)
     const parent = new Group()
     parent.add(pawn.object)
     pawn.dispose()
     expect(pawn.object.parent).toBeNull()
+    expect(again.meshes()[0].geometry).toBe(geometry)
+    expect(geometry.getAttribute('position')).toBeTruthy()
     materials.dispose()
   })
 })

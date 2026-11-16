@@ -16,12 +16,15 @@ describe('HallLighting', () => {
   it('uses one shadow-casting light sized for a Quest Pro frame budget', () => {
     const lighting = new HallLighting()
     const lights = lighting.lights()
-    expect(lights).toHaveLength(3)
+    expect(lights).toHaveLength(7)
     expect(lights.filter((light) => light.castShadow)).toHaveLength(1)
+    expect(lighting.key.castShadow).toBe(true)
     expect(lighting.key.shadow.mapSize.x).toBe(512)
     expect(lighting.key.shadow.mapSize.y).toBe(512)
+    expect(lighting.rect.intensity).toBe(0)
     for (const light of lights) {
       expect(Number.isFinite(light.intensity)).toBe(true)
+      if (light === lighting.rect) continue
       expect(light.intensity).toBeGreaterThan(0)
     }
     const parent = lighting.object.parent
@@ -111,7 +114,7 @@ describe('ChessHall', () => {
     for (const name of ['rug', 'baseboard-north', 'window-frame', 'seat', 'opponent-seat']) {
       expect(hall.root.getObjectByName(name), name).toBeTruthy()
     }
-    expect(hall.lighting.lights()).toHaveLength(3)
+    expect(hall.lighting.lights()).toHaveLength(7)
     expect(hall.lighting.lights().filter((light) => light.castShadow)).toHaveLength(1)
 
     for (const name of ['rug', 'baseboard-north', 'seat', 'opponent-seat']) {
@@ -125,6 +128,7 @@ describe('ChessHall', () => {
     })
 
     const materials = new Set<MeshStandardMaterial>()
+    const maps = new Set<unknown>()
     let meshes = 0
     hall.root.traverse((obj) => {
       const mesh = obj as Mesh
@@ -134,12 +138,12 @@ describe('ChessHall', () => {
       for (const material of list) {
         const standard = material as MeshStandardMaterial
         materials.add(standard)
-        expect(standard.map ?? null).toBeNull()
-        expect(standard.normalMap ?? null).toBeNull()
+        if (standard.map) maps.add(standard.map)
       }
     })
-    expect(meshes).toBeLessThan(120)
-    expect(materials.size).toBeLessThanOrEqual(20)
+    expect(maps.size).toBeLessThanOrEqual(4)
+    expect(meshes).toBeLessThan(180)
+    expect(materials.size).toBeLessThanOrEqual(24)
     hall.dispose()
   })
 

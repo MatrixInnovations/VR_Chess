@@ -1,8 +1,10 @@
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3 } from 'three'
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import { isOnBoard, squareKey } from '../contracts/squares'
 import type { Square } from '../contracts/types'
-import { BOARD_SURFACE_Y, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
+import { stampTileSeed } from './MarbleVeins'
+import { BOARD_SURFACE_Y, FRAME_WIDTH_M, INLAY_WIDTH_M, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
 import { PieceMaterialSet } from './PieceMaterialSet'
 
 /**
@@ -36,7 +38,7 @@ export class BoardModel {
 
   private readonly highlighted = new Set<string>()
 
-  private readonly geometries: BoxGeometry[] = []
+  private readonly geometries: { dispose: () => void }[] = []
 
   private readonly materials: PieceMaterialSet
 
@@ -65,6 +67,7 @@ export class BoardModel {
       const key = squareKey(square)
       const mesh = this.squares.get(key) as Mesh
       mesh.material = this.highlightMaterial
+      mesh.visible = true
       this.highlighted.add(key)
     }
   }
@@ -74,6 +77,7 @@ export class BoardModel {
     for (const key of this.highlighted) {
       const mesh = this.squares.get(key) as Mesh
       mesh.material = this.baseMaterials.get(key) as MeshStandardMaterial
+      mesh.visible = false
     }
     this.highlighted.clear()
   }
@@ -127,45 +131,118 @@ export class BoardModel {
   }
 
   private buildFrame(): void {
-    const geometry = new BoxGeometry(
-      SQUARE_SIZE_M * 8 + 0.02,
-      0.008,
-      SQUARE_SIZE_M * 8 + 0.02,
-    )
-    const material = this.materials.boardFrame()
-    const frame = new Mesh(geometry, material)
+    const span = SQUARE_SIZE_M * 8 + FRAME_WIDTH_M * 2
+    const thickness = 0.018
+    const top = BOARD_SURFACE_Y - 0.001
+    const geometry = new BoxGeometry(span, thickness, span)
+    stampTileSeed(geometry, 0, 0)
+    const frame = new Mesh(geometry, this.materials.boardFrame())
     frame.name = 'board-frame'
-    frame.position.y = BOARD_SURFACE_Y - SQUARE_THICKNESS_M - 0.004
+    frame.position.y = top - thickness / 2
     frame.receiveShadow = true
     this.object.add(frame)
+    this.geometries.push(geometry)
+    this.buildInlay(span)
+    this.buildCoordinates(span, top)
+  }
+
+  /** 2 mm grid, heavier inner rectangle, and the outer gold lip. One draw. */
+  private buildInlay(span: number): void {
+    const parts: BoxGeometry[] = []
+    const play = SQUARE_SIZE_M * 8
+    const y = BOARD_SURFACE_Y - 0.00015 - 0.0006
+    for (let index = 1; index <= 7; index += 1) {
+      const at = (index - 4) * SQUARE_SIZE_M
+      parts.push(bar(play, INLAY_WIDTH_M, at, y, 0, true))
+      parts.push(bar(play, INLAY_WIDTH_M, 0, y, at, false))
+    }
+    const inner = 0.0028
+    parts.push(bar(play + inner, inner, 0, y, play / 2, false))
+    parts.push(bar(play + inner, inner, 0, y, -play / 2, false))
+    parts.push(bar(play + inner, inner, play / 2, y, 0, true))
+    parts.push(bar(play + inner, inner, -play / 2, y, 0, true))
+    const lip = 0.004
+    const lipY = BOARD_SURFACE_Y - 0.0016
+    const outer = span / 2 - lip / 2
+    parts.push(bar(span, lip, 0, lipY, outer, false))
+    parts.push(bar(span, lip, 0, lipY, -outer, false))
+    parts.push(bar(span, lip, outer, lipY, 0, true))
+    parts.push(bar(span, lip, -outer, lipY, 0, true))
+    const geometry = mergeBufferGeometries(parts)
+    for (const part of parts) part.dispose()
+    if (!geometry) throw new Error('gold board merge failed')
+    const mesh = new Mesh(geometry, this.materials.gold())
+    mesh.name = 'board-inlay'
+    mesh.receiveShadow = true
+    mesh.castShadow = false
+    mesh.raycast = () => undefined
+    this.object.add(mesh)
     this.geometries.push(geometry)
   }
 
   private buildSquares(): void {
+    const tileSize = SQUARE_SIZE_M * 0.96
+    const proxyGeometry = new BoxGeometry(tileSize, SQUARE_THICKNESS_M, tileSize)
+    this.geometries.push(proxyGeometry)
+    const lightParts: BoxGeometry[] = []
+    const darkParts: BoxGeometry[] = []
     for (let rank = 0; rank < 8; rank += 1) {
       for (let file = 0; file < 8; file += 1) {
         const square = { file, rank }
-        // a8 (file 0, rank 0 in this board's index) is a light square, matching the existing board.
         const light = (file + rank) % 2 === 0
         const material = this.materials.boardSquare(light ? 'light' : 'dark')
-        const geometry = new BoxGeometry(
-          SQUARE_SIZE_M * 0.96,
-          SQUARE_THICKNESS_M,
-          SQUARE_SIZE_M * 0.96,
-        )
-        const mesh = new Mesh(geometry, material)
+        const proxy = new Mesh(proxyGeometry, material)
         const center = squareCenter(square)
-        mesh.position.set(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
-        mesh.name = `square-${file}-${rank}`
-        mesh.receiveShadow = true
-        mesh.userData.msRole = 'square'
-        mesh.userData.msSquare = { file, rank }
-        this.object.add(mesh)
+        proxy.position.set(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
+        proxy.name = `square-${file}-${rank}`
+        proxy.visible = false
+        proxy.userData.msRole = 'square'
+        proxy.userData.msSquare = { file, rank }
+        this.object.add(proxy)
         const key = squareKey(square)
-        this.squares.set(key, mesh)
+        this.squares.set(key, proxy)
         this.baseMaterials.set(key, material)
-        this.geometries.push(geometry)
+        const tile = new BoxGeometry(tileSize, SQUARE_THICKNESS_M, tileSize)
+        stampTileSeed(tile, file, rank)
+        tile.translate(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
+        ;(light ? lightParts : darkParts).push(tile)
       }
     }
+    this.addMerged('board-light', lightParts, this.materials.boardSquare('light'))
+    this.addMerged('board-dark', darkParts, this.materials.boardSquare('dark'))
   }
+
+  private addMerged(name: string, parts: BoxGeometry[], material: MeshStandardMaterial): void {
+    const geometry = mergeBufferGeometries(parts)
+    for (const part of parts) part.dispose()
+    if (!geometry) throw new Error(`${name} merge failed`)
+    const mesh = new Mesh(geometry, material)
+    mesh.name = name
+    mesh.receiveShadow = true
+    mesh.castShadow = false
+    mesh.raycast = () => undefined
+    this.object.add(mesh)
+    this.geometries.push(geometry)
+  }
+
+  /**
+   * a–h and 1–8 in the frame band.
+   * a is -X. Rank 1 is on white's near edge (+Z).
+   */
+  private buildCoordinates(span: number, frameTop: number): void {
+    const geometry = new PlaneGeometry(span, span)
+    const plane = new Mesh(geometry, this.materials.coords())
+    plane.name = 'board-coordinates'
+    plane.rotation.x = -Math.PI / 2
+    plane.position.y = frameTop + 0.0002
+    plane.raycast = () => undefined
+    this.object.add(plane)
+    this.geometries.push(geometry)
+  }
+}
+
+function bar(length: number, width: number, x: number, y: number, z: number, alongZ: boolean): BoxGeometry {
+  const geometry = alongZ ? new BoxGeometry(width, 0.0012, length) : new BoxGeometry(length, 0.0012, width)
+  geometry.translate(x, y, z)
+  return geometry
 }

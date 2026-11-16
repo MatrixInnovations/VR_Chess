@@ -24,6 +24,7 @@ if (staticExport) {
   nextConfig.headers = async function headers() {
     // `next dev` compiles the page with eval. Production responses stay on 'self'.
     const devScripts = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-inline' 'unsafe-eval'"
+    const devStyles = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-inline'"
     return [
       {
         source: '/:path*',
@@ -37,7 +38,7 @@ if (staticExport) {
             value: [
               "default-src 'self'",
               `script-src 'self'${devScripts}`,
-              "style-src 'self'",
+              `style-src 'self'${devStyles}`,
               "img-src 'self' data: blob:",
               "connect-src 'self' https://lichess.org",
               "worker-src 'self' blob:",

@@ -1,4 +1,6 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
+import { PCFSoftShadowMap, type WebGLRenderer } from 'three'
+import { configureHallStage } from '../mad-scientist/hall/HallStage'
 import { XR, XROrigin, useXR } from '@react-three/xr'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type RefObject } from 'react'
 import type { Group } from 'three'
@@ -142,17 +144,25 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         </div>
       ) : null}
       <p className="hall-meta">
-        {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} · {snap.turn} to move
+        {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} ·{' '}
+        <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn}</span> to move
         {snap.outcome ? ` · ${snap.outcome.status}` : ''}
       </p>
       <div className="hall-stage">
         <Canvas
           shadows="percentage"
+          gl={{ preserveDrawingBuffer: true, antialias: true }}
           camera={model.runtime.hall.camera}
           onCreated={(state: RootState) => {
-            if (state.gl.shadowMap) {
-              state.gl.shadowMap.autoUpdate = false
-              state.gl.shadowMap.needsUpdate = true
+            const gl = state.gl as WebGLRenderer
+            if (gl.shadowMap) {
+              gl.shadowMap.autoUpdate = false
+              gl.shadowMap.needsUpdate = true
+              gl.shadowMap.type = PCFSoftShadowMap
+            }
+            const quest = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
+            if (state.scene && typeof gl.render === 'function') {
+              configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest)
             }
             model.attachPointer(state.gl.domElement as unknown as PointerSurface)
           }}
@@ -201,6 +211,12 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     wasGrabbing.current = grabbing
     shadowGeneration.current = generation
     if (dirty && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
+    const orbit = model.runtime.hall.orbit
+    if (orbit) {
+      orbit.enabled = !grabbing
+      orbit.update()
+    }
+    model.runtime.hall.grade?.render()
   })
   return null
 }

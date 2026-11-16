@@ -79,6 +79,7 @@ export class HallRuntime {
    */
   frame(timestampMs: number): FrameReport {
     this.animator.update(timestampMs)
+    if (this.animator.isAnimating() || this.grab.isGrabbing()) this.hall.syncDecals()
     return this.budget.sample(timestampMs)
   }
 

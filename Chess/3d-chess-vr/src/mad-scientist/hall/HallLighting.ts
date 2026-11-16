@@ -1,12 +1,12 @@
-import { DirectionalLight, Group, HemisphereLight, Light } from 'three'
+import { DirectionalLight, Group, HemisphereLight, Light, PointLight, RectAreaLight } from 'three'
 
 import { BOARD_SURFACE_Y } from './metrics'
 
 /**
- * Three lights for the hall.
+ * Warm hall rig.
  *
- * Quest Pro needs to hold 72fps, so exactly one light casts a shadow and its
- * map is 512². A small table does not need a cascaded shadow map.
+ * The key is the only shadow caster. Quest stays at 512². Desktop raises the
+ * map and turns on the rect softbox. Fill, rim, and sconces never cast.
  */
 export class HallLighting {
   /** Group containing the lights and the key light's target. */
@@ -18,22 +18,33 @@ export class HallLighting {
   /** Main light from the player's front-right. The only shadow caster. */
   readonly key: DirectionalLight
 
-  /** Dim cool fill from the far side so black pieces are not a silhouette. */
+  /** Warm fill from the near-left. No shadow. */
+  readonly fill: DirectionalLight
+
+  /** Gold rim from behind the black pieces. No shadow. */
   readonly rim: DirectionalLight
+
+  /** Desktop softbox. Intensity stays 0 on Quest. */
+  readonly rect: RectAreaLight
+
+  /** Left practical. */
+  readonly sconceLeft: PointLight
+
+  /** Right practical. */
+  readonly sconceRight: PointLight
 
   /**
    * Creates the instance.
    */
   constructor() {
     this.object.name = 'lighting'
-    this.hemisphere = new HemisphereLight(0xf4efe4, 0x6b5344, 0.55)
+    this.hemisphere = new HemisphereLight(0xe8c9a0, 0x1a120c, 0.22)
     this.hemisphere.name = 'hemisphere'
 
-    this.key = new DirectionalLight(0xfff4e0, 1.15)
+    this.key = new DirectionalLight(0xffc89a, 1.15)
     this.key.name = 'key'
-    this.key.position.set(0.35, 2.2, 0.85)
+    this.key.position.set(0.42, 2.35, 0.95)
     this.key.castShadow = true
-    // 512 keeps the shadow pass inside the Quest frame. The hall is one table.
     this.key.shadow.mapSize.set(512, 512)
     this.key.shadow.bias = -0.0004
     this.key.shadow.normalBias = 0.01
@@ -47,16 +58,67 @@ export class HallLighting {
     shadowCamera.updateProjectionMatrix()
     this.key.target.position.set(0, BOARD_SURFACE_Y, 0)
 
-    this.rim = new DirectionalLight(0xd7e2ff, 0.28)
-    this.rim.name = 'rim'
-    this.rim.position.set(-0.8, 1.6, -0.9)
+    this.fill = new DirectionalLight(0xffd8b8, 0.22)
+    this.fill.name = 'fill'
+    this.fill.position.set(-0.55, 1.55, 0.7)
+    this.fill.target.position.set(0, BOARD_SURFACE_Y, 0)
 
-    this.object.add(this.hemisphere, this.key, this.key.target, this.rim)
+    this.rim = new DirectionalLight(0xffd4a0, 0.45)
+    this.rim.name = 'rim'
+    this.rim.position.set(-0.85, 1.85, -1.05)
+    this.rim.target.position.set(0, BOARD_SURFACE_Y, 0)
+
+    this.rect = new RectAreaLight(0xfff5ea, 0, 0.8, 0.5)
+    this.rect.name = 'softbox'
+    this.rect.position.set(0.15, 2.6, 0.6)
+    this.rect.lookAt(0, BOARD_SURFACE_Y, 0)
+
+    this.sconceLeft = new PointLight(0xffb56a, 0.35, 3.2, 2)
+    this.sconceLeft.name = 'sconce-left'
+    this.sconceLeft.position.set(-1.6, 1.75, -2.6)
+    this.sconceLeft.castShadow = false
+
+    this.sconceRight = new PointLight(0xffb56a, 0.35, 3.2, 2)
+    this.sconceRight.name = 'sconce-right'
+    this.sconceRight.position.set(1.6, 1.75, -2.6)
+    this.sconceRight.castShadow = false
+
+    this.object.add(
+      this.hemisphere,
+      this.key,
+      this.key.target,
+      this.fill,
+      this.fill.target,
+      this.rim,
+      this.rim.target,
+      this.rect,
+      this.sconceLeft,
+      this.sconceRight,
+    )
   }
 
-  /** Hemisphere, key, and rim. The key target is not a light. */
+  /** Every analytical light. Targets are not included. */
   lights(): readonly Light[] {
-    return [this.hemisphere, this.key, this.rim]
+    return [this.hemisphere, this.key, this.fill, this.rim, this.rect, this.sconceLeft, this.sconceRight]
+  }
+
+  /**
+   * Desktop uses a 2048 shadow and the rect softbox.
+   * Quest keeps the 512 map and leaves the softbox off.
+   */
+  setTier(tier: 'desktop' | 'quest'): void {
+    const desktop = tier === 'desktop'
+    this.key.intensity = desktop ? 1.55 : 1.15
+    this.key.shadow.mapSize.set(desktop ? 2048 : 512, desktop ? 2048 : 512)
+    this.key.shadow.normalBias = desktop ? 0.012 : 0.01
+    const span = desktop ? 0.7 : 0.6
+    const camera = this.key.shadow.camera
+    camera.left = -span
+    camera.right = span
+    camera.top = span
+    camera.bottom = -span
+    camera.updateProjectionMatrix()
+    this.rect.intensity = desktop ? 4 : 0
   }
 
   /** Remove the lights from their parent. */
