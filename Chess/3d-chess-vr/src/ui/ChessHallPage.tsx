@@ -74,11 +74,11 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
       </p>
       <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
         <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
-          White {formatClockMs(clock.white.remainingMs, clockBlank)}
+          White {formatClockMs(clock.white.remainingMs, clockBlank || !mounted)}
           {clockNote({ ...clock.white, blank: clockBlank })}
         </p>
         <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clockBlank ? 'no-clock' : clock.black.expiry} className={clockFaceClass({ ...clock.black, blank: clockBlank })}>
-          Black {formatClockMs(clock.black.remainingMs, clockBlank)}
+          Black {formatClockMs(clock.black.remainingMs, clockBlank || !mounted)}
           {clockNote({ ...clock.black, blank: clockBlank })}
         </p>
         <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
