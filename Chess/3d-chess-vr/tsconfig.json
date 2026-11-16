@@ -17,18 +17,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "jsxImportSource": "@emotion/react",
     "incremental": true,
-    "types": [
-      "@emotion/react/types/css-prop"
-    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@components/*": ["src/components/*"],
-      "@pages/*": ["src/pages/*"],
-      "@logic/*": ["src/logic/*"],
-      "@models/*": ["src/models/*"],
+      "@/*": [
+        "src/*"
+      ]
     }
   },
   "include": [
@@ -37,6 +31,7 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "coverage"
   ]
 }
