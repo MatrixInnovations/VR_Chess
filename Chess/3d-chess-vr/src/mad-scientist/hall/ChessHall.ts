@@ -38,6 +38,8 @@ export class ChessHall {
   /** Everything except the camera. Mount this in the R3F scene. */
   readonly root = new Group()
 
+  private shadowGenerationValue = 0
+
   /** Seated perspective camera. The renderer, not this group, should own it. */
   readonly camera: PerspectiveCamera
 
@@ -105,6 +107,7 @@ export class ChessHall {
     this.piecesGroup().add(model.object)
     this.pieceList.push(model)
     this.pieceById.set(model.id, model)
+    this.shadowGenerationValue += 1
     return model
   }
 
@@ -119,6 +122,7 @@ export class ChessHall {
     this.pieceById.delete(id)
     const index = this.pieceList.indexOf(model)
     if (index >= 0) this.pieceList.splice(index, 1)
+    this.shadowGenerationValue += 1
   }
 
   /**
@@ -129,6 +133,12 @@ export class ChessHall {
   setSceneryVisible(visible: boolean): void {
     const room = this.root.getObjectByName('room')
     if (room) room.visible = visible
+    this.shadowGenerationValue += 1
+  }
+
+  /** Bumps when a mesh is added, removed, or the room is shown or hidden. */
+  get shadowGeneration(): number {
+    return this.shadowGenerationValue
   }
 
   private piecesGroup(): Group {

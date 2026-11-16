@@ -143,22 +143,44 @@ describe('XR poses', () => {
     const object = new Object3D()
     const pose = poseFromObject(object)
     expect(pose.direction.z).toBeLessThan(0)
-    const sources = readXrPoses([
+    const gripOnly = readXrPoses([
       { id: 'right', type: 'controller', handedness: 'right', object, gamepad: { buttons: [{ pressed: true }] } },
-      {
-        id: 'left',
-        type: 'hand',
-        handedness: 'left',
-        inputSource: {
-          handedness: 'left',
-          hand: { get: () => ({}) },
+    ])
+    expect(gripOnly[0]?.tracked).toBe(false)
+    const sources = readXrPoses(
+      [
+        {
+          id: 'right',
+          type: 'controller',
+          handedness: 'right',
+          object,
+          gamepad: { buttons: [{ pressed: true }] },
+          inputSource: { targetRaySpace: { id: 'ray' } },
         },
+        {
+          id: 'left',
+          type: 'hand',
+          handedness: 'left',
+          inputSource: {
+            handedness: 'left',
+            targetRaySpace: { id: 'hand-ray' },
+            hand: { get: () => ({}) },
+          },
+        },
+      ],
+      {
+        getPose: () => ({
+          transform: { position: { x: 0, y: 1, z: 0 }, orientation: { x: 0, y: 0, z: 0, w: 1 } },
+        }),
+        getJointPose: () => ({
+          transform: { position: { x: 1, y: 2, z: 3 }, orientation: { x: 0, y: 0, z: 0, w: 1 } },
+        }),
       },
-    ], {
-      getJointPose: () => ({ transform: { position: { x: 1, y: 2, z: 3 }, orientation: { x: 0, y: 0, z: 0, w: 1 } } }),
-    }, {})
+      {},
+    )
     expect(sources[0]?.tracked).toBe(true)
     expect(sources[0]?.selecting).toBe(true)
+    expect(sources[0]?.direction?.z).toBeLessThan(0)
     expect(sources[1]?.hand).toBe('left')
     expect(sources[1]?.thumbTip).toEqual({ x: 1, y: 2, z: 3 })
   })

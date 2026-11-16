@@ -136,7 +136,11 @@ export class ChessApplication {
   private readonly bridge = new PickerBridge()
   private readonly picker: RaycastPicker
   private revisionValue = 0
-  private paintedClock = ''
+  private paintedWhite = -1
+  private paintedBlack = -1
+  private paintedSide = ''
+  private reconciledVersion = -1
+  private xrBusy = false
   private readonly watchers = new Set<() => void>()
   private unlisten: (() => void) | null = null
   private surface: PointerSurface | null = null
@@ -154,6 +158,10 @@ export class ChessApplication {
     }
     this.xr = options.xr ?? new WebXrHallSession()
     this.xr.onSessionEnd(() => {
+      this.runtime.grab.cancel('detached')
+      this.runtime.controllers.cancel('detached')
+      this.runtime.hands.cancel('detached')
+      this.xrPump.reset()
       if (!this.modes.mode.isImmersive()) return
       this.modes.switchTo('desktop3d')
       this.runtime.hall.setSceneryVisible(true)
@@ -290,12 +298,18 @@ export class ChessApplication {
     this.runtime.frame(at)
     const fridae = this.readModel.fridae()
     if (fridae) this.physicalClock.apply(this.mirror.present(fridae))
-    this.sync.reconcile()
+    const version = this.session.snapshot.positionVersion
+    if (version !== this.reconciledVersion) {
+      this.sync.reconcile()
+      this.reconciledVersion = version
+    }
     const white = Math.floor(this.readModel.whiteMs / 1000)
     const black = Math.floor(this.readModel.blackMs / 1000)
-    const painted = `${white}:${black}:${this.readModel.active}`
-    if (painted !== this.paintedClock) {
-      this.paintedClock = painted
+    const side = this.readModel.active
+    if (white !== this.paintedWhite || black !== this.paintedBlack || side !== this.paintedSide) {
+      this.paintedWhite = white
+      this.paintedBlack = black
+      this.paintedSide = side
       this.bump()
     }
   }
@@ -399,6 +413,17 @@ export class ChessApplication {
    * and puts the presentation back on the desktop.
    */
   async toggleImmersive(): Promise<void> {
+    if (this.xrBusy) return
+    this.xrBusy = true
+    try {
+      await this.switchImmersive()
+    } finally {
+      this.xrBusy = false
+    }
+  }
+
+  /** Flip the headset presentation. A second press waits until this one settles. */
+  private async switchImmersive(): Promise<void> {
     this.toggle.press()
     if (this.modes.mode.isImmersive()) {
       const ok = await this.xr.enterVR()

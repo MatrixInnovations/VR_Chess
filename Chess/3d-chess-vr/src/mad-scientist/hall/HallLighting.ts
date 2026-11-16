@@ -38,10 +38,10 @@ export class HallLighting {
     this.key.shadow.bias = -0.0004
     this.key.shadow.normalBias = 0.01
     const shadowCamera = this.key.shadow.camera
-    shadowCamera.left = -0.5
-    shadowCamera.right = 0.5
-    shadowCamera.top = 0.5
-    shadowCamera.bottom = -0.5
+    shadowCamera.left = -0.6
+    shadowCamera.right = 0.6
+    shadowCamera.top = 0.6
+    shadowCamera.bottom = -0.6
     shadowCamera.near = 1
     shadowCamera.far = 3.5
     shadowCamera.updateProjectionMatrix()

@@ -26,6 +26,12 @@ export class RaycastPicker implements IPointerPicker {
 
   private readonly ndc = new Vector2()
 
+  private readonly rayOrigin = new Vector3()
+
+  private readonly rayDir = new Vector3()
+
+  private readonly hits: ReturnType<Raycaster['intersectObject']> = []
+
   /**
    * Creates the instance.
    */
@@ -57,17 +63,19 @@ export class RaycastPicker implements IPointerPicker {
    * @param direction - Ray direction. It is normalized inside this method.
    */
   pickRay(origin: Vec3, direction: Vec3): BoardPick {
-    const dir = new Vector3(direction.x, direction.y, direction.z)
-    if (dir.lengthSq() === 0) return { square: null, piece: null, clock: false, world: null }
-    dir.normalize()
-    this.raycaster.set(new Vector3(origin.x, origin.y, origin.z), dir)
+    this.rayDir.set(direction.x, direction.y, direction.z)
+    if (this.rayDir.lengthSq() === 0) return { square: null, piece: null, clock: false, world: null }
+    this.rayDir.normalize()
+    this.rayOrigin.set(origin.x, origin.y, origin.z)
+    this.raycaster.set(this.rayOrigin, this.rayDir)
     return this.cast()
   }
 
   private cast(): BoardPick {
-    this.hall.root.updateMatrixWorld(true)
-    const hits = this.raycaster.intersectObject(this.hall.root, true)
-    for (const hit of hits) {
+    this.hall.root.updateMatrixWorld(false)
+    this.hits.length = 0
+    this.raycaster.intersectObject(this.hall.root, true, this.hits)
+    for (const hit of this.hits) {
       const role = readRole(hit.object)
       if (!role) continue
       const world: Vec3 = { x: hit.point.x, y: hit.point.y, z: hit.point.z }

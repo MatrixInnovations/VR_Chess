@@ -30,7 +30,7 @@ vi.mock('@react-three/xr', () => {
   const React = require('react') as typeof import('react')
   return {
     XR: (props: { children?: React.ReactNode }) => React.createElement('div', null, props.children),
-    XROrigin: () => null,
+    XROrigin: React.forwardRef(() => null),
     useXR: () => ({ inputSourceStates: [] }),
     createXRStore: () => ({
       enterVR: async () => undefined,

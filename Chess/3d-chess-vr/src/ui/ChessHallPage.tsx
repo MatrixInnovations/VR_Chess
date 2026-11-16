@@ -1,9 +1,10 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
 import { XR, XROrigin, useXR } from '@react-three/xr'
-import { useEffect, useState, useSyncExternalStore, type ReactElement } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type RefObject } from 'react'
+import type { Group } from 'three'
 
 import { ChessApplication, type PointerSurface } from '../app/ChessApplication'
-import { readXrPoses, type LooseXrInput } from '../app/XrInputPump'
+import { readXrPoses, type LooseXrInput, type XrFrameLike } from '../app/XrInputPump'
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
 import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
@@ -42,6 +43,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
     }
   }, [model])
   const store = model.xr instanceof WebXrHallSession ? model.xr.store : null
+  const origin = useRef<Group>(null)
   const clock = model.clockView.present()
   const step = model.tour.current()
   const screen = model.shell.navigator.screen.name
@@ -159,9 +161,9 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         >
           {store ? (
             <XR store={store}>
-              <XROrigin position={[0, 0, SEATED_EYE_Z_M]} />
+              <XROrigin ref={origin} position={[0, 0, SEATED_EYE_Z_M]} />
               <HallTicker model={model} />
-              <XrReader model={model} />
+              <XrReader model={model} origin={origin} />
               <ChessHallView hall={model.runtime.hall} />
             </XR>
           ) : (
@@ -182,9 +184,18 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
  * @returns Nothing visible.
  */
 function HallTicker({ model }: { model: ChessApplication }): null {
+  const wasAnimating = useRef(false)
+  const shadowGeneration = useRef(-1)
   useFrame((state) => {
     model.frame()
-    if (model.runtime.animator.isAnimating() && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
+    const animating = model.runtime.animator.isAnimating()
+    const grabbing = model.runtime.grab.isGrabbing()
+    const generation = model.runtime.hall.shadowGeneration
+    const dirty =
+      animating || grabbing || wasAnimating.current || generation !== shadowGeneration.current
+    wasAnimating.current = animating
+    shadowGeneration.current = generation
+    if (dirty && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
   })
   return null
 }
@@ -194,10 +205,13 @@ function HallTicker({ model }: { model: ChessApplication }): null {
  * @param props - The application.
  * @returns Nothing visible.
  */
-function XrReader({ model }: { model: ChessApplication }): null {
+function XrReader({ model, origin }: { model: ChessApplication; origin: RefObject<Group | null> }): null {
   const inputs = useXR((state) => state.inputSourceStates)
-  useFrame(() => {
-    model.pushXr(readXrPoses(inputs as readonly LooseXrInput[]))
+  useFrame((state, _delta, frame) => {
+    const space = state.gl.xr.getReferenceSpace()
+    model.pushXr(
+      readXrPoses(inputs as readonly LooseXrInput[], (frame ?? null) as XrFrameLike | null, space, origin.current),
+    )
   })
   return null
 }

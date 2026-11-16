@@ -81,6 +81,11 @@ export class PieceGrab {
     this.source = source
   }
 
+  /** Device that started the current gesture. */
+  get activeSource(): MoveSource {
+    return this.source
+  }
+
   /**
    * Point later grabs at a different session.
    * Used when a new game replaces the previous one. A view toggle does not call this.

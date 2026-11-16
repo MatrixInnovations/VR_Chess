@@ -70,9 +70,11 @@ export class HandTrackingInput implements IInputController {
     if (this.owner && sample.hand && sample.hand !== this.owner) return
 
     if (!sample.tracked || sample.thumbTip === null || sample.indexTip === null) {
-      // Only a held piece cancels through the session. A clock pinch that
-      // loses tracking is not a move and must not look like one.
-      if (this.grab.isGrabbing()) this.grab.cancel('tracking-loss')
+      // A lost hand cancels only the pinch it owns. A controller or pointer
+      // drag on the shared grab must stay put.
+      if (this.pinchHeld && this.grab.activeSource === 'hand' && this.grab.isGrabbing()) {
+        this.grab.cancel('tracking-loss')
+      }
       this.pinchHeld = false
       this.owner = null
       return
