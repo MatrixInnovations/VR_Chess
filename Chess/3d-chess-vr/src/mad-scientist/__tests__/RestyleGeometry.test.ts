@@ -27,7 +27,7 @@ describe('marble veins', () => {
       vertexShader: '#include <common>\n#include <uv_vertex>\n',
       fragmentShader: '#include <common>\n#include <map_fragment>\n#include <roughnessmap_fragment>\n',
     }
-    material.onBeforeCompile(shader, material)
+    material.onBeforeCompile(shader, {} as WebGLRenderer)
     expect(shader.vertexShader).toContain('tileSeed')
     expect(shader.fragmentShader).toContain('marbleAlbedo')
     expect(shader.uniforms.uMarbleDark.value).toBe(1)
@@ -112,7 +112,7 @@ describe('hall stage', () => {
     configureHallStage(gl, scene, hall.camera, hall, false, {
       loader: {
         load(_url, _onLoad, _progress, onError) {
-          onError?.(new Error('offline'))
+          onError?.()
         },
       },
       bake: () => ({ texture: environment }),
@@ -141,7 +141,7 @@ describe('hall stage', () => {
     configureHallStage({} as WebGLRenderer, scene, hall.camera, hall, true, {
       loader: {
         load(_url, onLoad) {
-          onLoad(hdr)
+          onLoad?.(hdr)
         },
       },
       bake: () => ({ texture: environment }),

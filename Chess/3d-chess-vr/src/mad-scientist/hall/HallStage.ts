@@ -32,8 +32,17 @@ interface EnvBake {
   texture: Texture
 }
 
+interface StudioLoader {
+  load: (
+    url: string,
+    onLoad: (texture: Texture) => void,
+    onProgress?: (event: ProgressEvent) => void,
+    onError?: () => void,
+  ) => void
+}
+
 interface StudioHooks {
-  loader?: { load: RGBELoader['load'] }
+  loader?: StudioLoader
   bake?: (renderer: WebGLRenderer, scene: Scene) => EnvBake
 }
 
@@ -91,7 +100,7 @@ export function configureHallStage(
 
 /** Load the self-hosted studio HDR. A failed read falls back to the softbox scene. */
 export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: StudioHooks): void {
-  const loader = hooks?.loader ?? new RGBELoader()
+  const loader = hooks?.loader ?? { load: loadStudioHdr }
   const bake = hooks?.bake
   loader.load(
     STUDIO_HDR_URL,
@@ -109,4 +118,13 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
       scene.environment = buildEnvironment(gl, darkHallEnvScene(), bake)
     },
   )
+}
+
+function loadStudioHdr(
+  url: string,
+  onLoad: (texture: Texture) => void,
+  onProgress?: (event: ProgressEvent) => void,
+  onError?: () => void,
+): void {
+  new RGBELoader().load(url, (texture) => onLoad(texture), onProgress, () => onError?.())
 }
