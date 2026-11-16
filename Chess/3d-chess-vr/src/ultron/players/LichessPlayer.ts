@@ -151,17 +151,12 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
   }
 
   /**
-   * Open the event stream, ignore games already in `/api/account/playing`, then adopt the new one.
-   * A `gameStart` for an ongoing game is ignored even when it arrives after the seek is posted.
+   * The event stream is already open and already knows which games are foreign.
+   * Mark the next `gameStart` as the one this seek or challenge is waiting for.
    */
   private async prepareForNewGame(signal: AbortSignal): Promise<TransportResult> {
     const ready = await this.ensureStarted(signal);
     if (!ready.ok) return ready;
-    const token = this.tokens.getAccessToken();
-    if (token) {
-      const playing = await this.client.listPlaying(token, signal);
-      for (const gameId of playing) this.foreignGames.add(gameId);
-    }
     this.acceptNewGame = true;
     this.activeGameId = null;
     return ready;
@@ -189,6 +184,16 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
     }
     this.accountLabel = account.username;
     this.inbox?.onAccount(account.username, account.id);
+    const playing = await this.client.listPlaying(token, signal);
+    if (!playing.ok) {
+      this.inbox?.onStreamFault({
+        code: playing.result.code === 'unauthorized' ? 'unauthorized' : 'http',
+        message: playing.result.message,
+        httpStatus: playing.result.httpStatus,
+      });
+      return playing.result;
+    }
+    for (const gameId of playing.gameIds) this.foreignGames.add(gameId);
     this.events = new AbortController();
     if (signal.aborted) return TransportResult.fail('cancelled', 'Stream aborted');
     const opened = this.client.openEventStream(token, this.events.signal, {

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ChessPhraseParser } from '../ChessPhraseParser'
+import { VoiceCommandInput } from '../VoiceCommandInput'
 import {
   BrowserSpeechRecognitionFactory,
   WebSpeechRecognitionAdapter,
@@ -22,8 +24,12 @@ class FakeRecognition implements SpeechRecognitionLike {
   behavior: 'ok' | 'error' | 'end' | 'silent' = 'ok'
   errorName = 'not-allowed'
 
+  /** Cumulative finals, the way Chrome keeps every result since `start`. */
+  private accumulated: Array<{ isFinal: boolean; length: number; 0: { transcript: string } }> = []
+
   start(): void {
     this.started += 1
+    this.accumulated = []
     if (this.startError) throw this.startError
     if (this.behavior === 'ok') this.onstart?.()
     if (this.behavior === 'error') this.onerror?.({ error: this.errorName })
@@ -40,11 +46,11 @@ class FakeRecognition implements SpeechRecognitionLike {
     this.onend?.()
   }
 
+  /** Append one final. `resultIndex` points at it; older finals stay in `results`. */
   emitFinal(text: string): void {
-    this.onresult?.({
-      resultIndex: 0,
-      results: [{ isFinal: true, 0: { transcript: text }, length: 1 }],
-    })
+    const resultIndex = this.accumulated.length
+    this.accumulated.push({ isFinal: true, length: 1, 0: { transcript: text } })
+    this.onresult?.({ resultIndex, results: this.accumulated })
   }
 
   emitParts(parts: Array<{ text: string; isFinal: boolean }>): void {
@@ -269,12 +275,61 @@ describe('WebSpeechRecognitionAdapter', () => {
     expect(adapter.status()).toBe('idle')
   })
 
-  it('returns to idle when the recognizer ends after a phrase', async () => {
+  it('confirms a move when yes is the next cumulative result, and no cancels it', async () => {
+    const factory = new FakeFactory()
+    const speech = new WebSpeechRecognitionAdapter(factory)
+    const session = {
+      legalMoves: () => [{ from: 'e2', to: 'e4' }],
+      submitMoveIntent: vi.fn(() => true),
+      requestOriginClarification: vi.fn(),
+    }
+    const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
+    await input.start()
+    const recognition = factory.created[0]
+    recognition.emitFinal('pawn to e4')
+    recognition.emitFinal('yes')
+    expect(session.submitMoveIntent).toHaveBeenCalledWith({ from: 'e2', to: 'e4', source: 'voice' })
+
+    const cancelled = {
+      legalMoves: () => [{ from: 'e2', to: 'e4' }],
+      submitMoveIntent: vi.fn(() => true),
+      requestOriginClarification: vi.fn(),
+    }
+    const second = new VoiceCommandInput(new WebSpeechRecognitionAdapter(factory), new ChessPhraseParser(), cancelled)
+    await second.start()
+    const again = factory.created[factory.created.length - 1]
+    again.emitFinal('pawn to e4')
+    again.emitFinal('no')
+    again.emitFinal('yes')
+    expect(cancelled.submitMoveIntent).not.toHaveBeenCalled()
+  })
+
+  it('drops a pending confirmation when listening starts again', async () => {
+    const factory = new FakeFactory()
+    const speech = new WebSpeechRecognitionAdapter(factory)
+    const session = {
+      legalMoves: () => [{ from: 'e2', to: 'e4' }],
+      submitMoveIntent: vi.fn(() => true),
+      requestOriginClarification: vi.fn(),
+    }
+    const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
+    await input.start()
+    factory.created[0].emitFinal('pawn to e4')
+    await input.stop()
+    await input.start()
+    factory.created[1].emitFinal('yes')
+    expect(session.submitMoveIntent).not.toHaveBeenCalled()
+  })
+
+  it('restarts after the recognizer ends on silence', async () => {
     const factory = new FakeFactory()
     const adapter = new WebSpeechRecognitionAdapter(factory)
     await adapter.start()
+    factory.created[0].emitFinal('pawn to e4')
     factory.created[0].onend?.()
-    expect(adapter.status()).toBe('idle')
+    expect(factory.created).toHaveLength(2)
+    expect(adapter.status()).toBe('listening')
+    expect(adapter.readFinal()).toBe('')
   })
 
   it('clears a previous transcript when a new listen starts', async () => {

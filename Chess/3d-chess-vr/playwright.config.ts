@@ -1,12 +1,11 @@
 import { defineConfig } from '@playwright/test'
 
 /**
- * Browser smoke for the seated hall.
- * `next dev` keeps `NODE_ENV` off production so the test hook exists.
- * The production build does not install `window.__CHESS_APP__`.
+ * Dev smoke. `next dev` keeps `NODE_ENV` off production so the test hook exists.
+ * The production smoke is `playwright.prod.config.ts` and runs against `next start`.
  */
 export default defineConfig({
-  testDir: './e2e',
+  testMatch: '**/hall.spec.ts',
   timeout: 90_000,
   use: {
     baseURL: 'http://127.0.0.1:3456',

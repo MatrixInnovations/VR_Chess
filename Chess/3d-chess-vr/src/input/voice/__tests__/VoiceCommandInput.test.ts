@@ -367,6 +367,30 @@ describe('VoiceCommandInput confirmation', () => {
     expect(session.submitMoveIntent).toHaveBeenCalledWith({ from: 'b1', to: 'c3', source: 'voice' })
   })
 
+  it('confirms with do it and names rook, bishop, and knight promotions', async () => {
+    const speech = new FakeSpeech()
+    const session = createSession([{ from: 'e2', to: 'e4' }])
+    const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
+    await input.start()
+    speech.emit('pawn to e4')
+    speech.emit('maybe later')
+    speech.emit('do it')
+    expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
+    for (const word of ['rook', 'bishop', 'knight'] as const) {
+      const promoSpeech = new FakeSpeech()
+      const promo = createSession([
+        { from: 'e7', to: 'e8', promotion: 'q' },
+        { from: 'e7', to: 'e8', promotion: word === 'rook' ? 'r' : word === 'bishop' ? 'b' : 'n' },
+      ])
+      const promoInput = new VoiceCommandInput(promoSpeech, new ChessPhraseParser(), promo)
+      await promoInput.start()
+      promoSpeech.emit('pawn to e8')
+      promoSpeech.emit(word)
+      promoSpeech.emit('yes')
+      expect(promo.submitMoveIntent).toHaveBeenCalled()
+    }
+  })
+
   it('forgets a pending yes after stop, and accepts a polite yes', async () => {
     const speech = new FakeSpeech()
     const session = createSession([{ from: 'e2', to: 'e4' }])

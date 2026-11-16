@@ -42,6 +42,7 @@ export class VoiceCommandInput implements IInputController {
    */
   async start(): Promise<void> {
     if (this.disposed) return
+    this.clearPending()
     const generation = ++this.generation
     this.clearSubscription()
     this.unsubscribe = this.speech.onFinal(() => {
@@ -143,7 +144,7 @@ export class VoiceCommandInput implements IInputController {
       if (!accepted) this.session.requestOriginClarification([])
       return
     }
-    if (normalized === 'no' || normalized === 'cancel') {
+    if (this.isNegative(normalized)) {
       this.pendingIntent = null
       this.pendingCandidates = null
       this.consumed = false
@@ -182,6 +183,16 @@ export class VoiceCommandInput implements IInputController {
     this.pendingIntent = candidates[0]
     this.consumed = false
     this.session.requestOriginClarification([candidates[0]])
+  }
+
+  /** “no” or “cancel”, including a trailing period. */
+  private isNegative(phrase: string): boolean {
+    const words = phrase
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
+    return words.length === 1 && (words[0] === 'no' || words[0] === 'cancel')
   }
 
   /** Yes, including “Yes.” and “yes please”. */

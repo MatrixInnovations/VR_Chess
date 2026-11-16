@@ -113,12 +113,17 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
         finish()
       }
       recognition.onend = () => {
-        const ended = this.recognition
-        if (this.statusKind === 'listening') this.statusKind = 'idle'
         finish()
-        if (!this.explicitStop && ended && this.recognition === null && this.factory.isSupported()) {
-          void this.start()
+        const wasListening = this.statusKind === 'listening' && this.recognition === recognition
+        if (!wasListening || this.explicitStop || !this.factory.isSupported()) {
+          if (this.statusKind === 'listening') this.statusKind = 'idle'
+          return
         }
+        // Chrome ends the session on silence. Drop this instance before restarting
+        // so `start` does not abort it and re-enter `onend`.
+        this.statusKind = 'idle'
+        this.recognition = null
+        void this.start()
       }
       recognition.onresult = (event) => {
         this.capture(event)
@@ -193,7 +198,8 @@ export class WebSpeechRecognitionAdapter implements ISpeechRecognitionPort {
   private capture(event: SpeechRecognitionEventLike): void {
     if (this.statusKind !== 'listening') return
     let text = ''
-    for (let index = 0; index < event.results.length; index += 1) {
+    const start = Math.max(0, Math.min(event.resultIndex, event.results.length))
+    for (let index = start; index < event.results.length; index += 1) {
       const result = event.results[index]
       if (!result.isFinal) continue
       text += result[0].transcript

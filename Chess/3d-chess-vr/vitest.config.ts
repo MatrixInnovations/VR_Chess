@@ -26,29 +26,26 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'text-summary', 'json-summary'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+        // In-memory ports and recorded NDJSON used only by screen tests.
+        // They are not the hall, the session, or a screen the player sees.
+        'src/vision/screens/testing/**',
+        'src/vision/screens/fixtures/**',
+      ],
       thresholds: {
         lines: 80,
         branches: 75,
-        // Directory globs are aggregates. Vitest's perFile flag is global, and a
-        // blanket per-file 80/75 still fails on vision screens and a few hall
-        // helpers, so the reviewed files are gated one path at a time.
-        'src/app/**': { lines: 80, branches: 75 },
-        'src/input/**': { lines: 80, branches: 75 },
-        'src/ui/**': { lines: 80, branches: 75 },
-        'src/ultron/**': { lines: 80, branches: 75 },
-        'src/vision/**': { lines: 80, branches: 75 },
-        'src/app/ChessApplication.ts': { lines: 80, branches: 75 },
-        'src/app/PhysicalChessClock.ts': { lines: 80, branches: 75 },
-        'src/app/HallBoardSync.ts': { lines: 80, branches: 75 },
-        'src/app/WebXrHallSession.ts': { lines: 80, branches: 75 },
-        'src/app/FridaeReadModel.ts': { lines: 80, branches: 75 },
-        'src/ui/ChessHallPage.tsx': { lines: 80, branches: 75 },
+        perFile: true,
+        // ChessClock.ts lives in fridae-clock, outside this Vite root, so a glob
+        // here matches nothing. fridae-clock/scripts/check-chess-clock-coverage.mjs
+        // requires src/ChessClock.ts lines >= 90.
         'src/**/GameSession.ts': { lines: 90 },
-        'src/**/LichessClient.ts': { lines: 90 },
-        'src/**/ChessPhraseParser.ts': { lines: 90 },
+        'src/**/LichessClient.ts': { lines: 93.99, branches: 75 },
+        'src/**/ChessPhraseParser.ts': { lines: 100, branches: 97.84 },
         'src/**/ViewModeManager.ts': { lines: 90 },
-        'src/input/voice/VoiceCommandInput.ts': { lines: 90, branches: 75 },
+        'src/input/voice/VoiceCommandInput.ts': { lines: 90, branches: 97.5 },
       },
     },
   },

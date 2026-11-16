@@ -206,23 +206,30 @@ export class LichessClient {
    */
   /**
    * `GET /api/account/playing`. Ids already in progress must not be adopted as a new seek.
+   * A failed response is not an empty list: the caller must adopt nothing.
    * @param token - Bearer token.
    * @param signal - Abort signal.
-   * @returns Game ids, or an empty list when the payload is unusable.
+   * @returns The ids, or the transport failure.
    */
-  async listPlaying(token: string, signal: AbortSignal): Promise<readonly string[]> {
+  async listPlaying(
+    token: string,
+    signal: AbortSignal,
+  ): Promise<{ ok: true; gameIds: readonly string[] } | { ok: false; result: TransportResult }> {
     const result = await this.request(token, 'GET', `${ORIGIN}/api/account/playing`, undefined, signal, false);
-    if (!result.ok) return [];
+    if (!result.ok) return { ok: false, result: result.error };
     try {
       const body = JSON.parse(result.text) as { nowPlaying?: unknown };
-      if (!Array.isArray(body.nowPlaying)) return [];
-      return body.nowPlaying.flatMap((entry) => {
+      if (!Array.isArray(body.nowPlaying)) {
+        return { ok: false, result: TransportResult.fail('invalid', 'Playing list was unusable', result.status) };
+      }
+      const gameIds = body.nowPlaying.flatMap((entry) => {
         if (!entry || typeof entry !== 'object') return [];
         const gameId = (entry as { gameId?: unknown }).gameId;
         return typeof gameId === 'string' && gameId.length > 0 ? [gameId] : [];
       });
+      return { ok: true, gameIds };
     } catch {
-      return [];
+      return { ok: false, result: TransportResult.fail('invalid', 'Playing list was not JSON', result.status) };
     }
   }
 

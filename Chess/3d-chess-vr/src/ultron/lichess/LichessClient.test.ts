@@ -376,4 +376,37 @@ describe('LichessClient streams', () => {
     expect(seen).toEqual(['e2e4']);
     expect(faults).toContain('malformed');
   });
+
+  it('rejects a playing list that is not a usable array and keeps a real id', async () => {
+    const transport = new MockTransport();
+    const { client } = makeClient(transport);
+    const signal = new AbortController().signal;
+    transport.handlers.push(async () => ({ status: 200, headers: {}, body: null, text: async () => 'not-json' }));
+    const broken = await client.listPlaying(TOKEN, signal);
+    expect(broken.ok).toBe(false);
+    transport.handlers.push(async () => jsonResponse(200, { nowPlaying: 'nope' }));
+    const shape = await client.listPlaying(TOKEN, signal);
+    expect(shape.ok).toBe(false);
+    transport.handlers.push(async () =>
+      jsonResponse(200, { nowPlaying: [null, 4, { gameId: '' }, { gameId: 'abc' }, { nope: true }] }),
+    );
+    const ids = await client.listPlaying(TOKEN, signal);
+    expect(ids.ok && ids.gameIds).toEqual(['abc']);
+    transport.handlers.push(async () => ({ status: 200, headers: {}, body: null, text: async () => 'nope' }));
+    const posted = await client.resign(TOKEN, 'abc', signal);
+    expect(posted.ok).toBe(true);
+    transport.handlers.push(async () => ({
+      status: 200,
+      headers: {},
+      text: async () => '',
+      body: {
+        getReader: () => ({
+          read: async () => ({ done: true, value: undefined }),
+          releaseLock: () => undefined,
+        }),
+      } as unknown as AsyncIterable<Uint8Array>,
+    }));
+    const sought = await client.createSeek(TOKEN, { kind: 'realtime', timeMinutes: 10, incrementSeconds: 0 }, signal);
+    expect(sought.ok).toBe(true);
+  });
 });

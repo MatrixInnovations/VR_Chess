@@ -57,7 +57,7 @@ vi.mock('@react-three/xr', () => {
           inputSource: {
             handedness: 'left',
             targetRaySpace: { id: 'hand-ray' },
-            hand: { get: () => ({ joint: true }) },
+            hand: { get: (name: string) => ({ name }) },
           },
         },
       ]
@@ -107,5 +107,57 @@ describe('ChessHallPage XR frame path', () => {
     expect(hand?.tracked).toBe(true)
     expect(hand?.thumbTip?.z).toBeCloseTo(0.62)
     expect(hand?.origin?.z).toBeCloseTo(0.62)
+    expect(hand?.indexTip?.z).toBeCloseTo(0.62)
+    if (hand?.thumbTip && hand.indexTip) {
+      const gap = Math.hypot(hand.thumbTip.x - hand.indexTip.x, hand.thumbTip.y - hand.indexTip.y, hand.thumbTip.z - hand.indexTip.z)
+      expect(gap).toBe(0)
+    }
+  })
+
+  it('pinches the e2 pawn and completes e2-e4 when the hand opens', () => {
+    frames.length = 0
+    let time = 0
+    const model = new ChessApplication({ now: () => time, xr: undefined })
+    const pawn = model.runtime.hall.getPieces().find((piece) => piece.id === 'white-pawn-5')
+    expect(pawn?.getSquare()).toEqual({ file: 4, rank: 6 })
+    const home = model.runtime.hall.board.worldPosition({ file: 4, rank: 6 })
+    const dest = model.runtime.hall.board.worldPosition({ file: 4, rank: 4 })
+    render(<ChessHallPage app={model} />)
+    const down = { x: -Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 }
+    let aim = home
+    let spread = 0.01
+    const frame = {
+      getPose: () => ({
+        transform: {
+          position: { x: aim.x, y: aim.y + 0.25, z: aim.z - 0.62 },
+          orientation: down,
+        },
+      }),
+      getJointPose: (joint: { name?: string }) => {
+        const index = joint.name === 'index-finger-tip'
+        return {
+          transform: {
+            position: { x: aim.x + (index ? spread : 0), y: aim.y + 0.04, z: aim.z - 0.62 },
+            orientation: { x: 0, y: 0, z: 0, w: 1 },
+          },
+        }
+      },
+    }
+    const state = {
+      gl: {
+        shadowMap: { needsUpdate: false, autoUpdate: false },
+        xr: { getReferenceSpace: () => ({ name: 'local-floor' }) },
+      },
+    }
+    for (const callback of frames) callback(state, 0, frame)
+    expect(model.runtime.grab.isGrabbing()).toBe(true)
+    aim = dest
+    spread = 0.06
+    for (const callback of frames) callback(state, 0, frame)
+    expect(model.runtime.grab.isGrabbing()).toBe(false)
+    expect(model.game.getPieces().find((piece) => piece.id === 'white-pawn-5')?.square).toEqual({ file: 4, rank: 4 })
+    time = 5_000
+    model.frame(time)
+    expect(pawn?.getSquare()).toEqual({ file: 4, rank: 4 })
   })
 })

@@ -182,6 +182,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
  */
 function HallTicker({ model }: { model: ChessApplication }): null {
   const wasAnimating = useRef(false)
+  const wasGrabbing = useRef(false)
   const shadowGeneration = useRef(-1)
   useFrame((state) => {
     model.frame()
@@ -189,8 +190,13 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     const grabbing = model.runtime.grab.isGrabbing()
     const generation = model.runtime.hall.shadowGeneration
     const dirty =
-      animating || grabbing || wasAnimating.current || generation !== shadowGeneration.current
+      animating ||
+      grabbing ||
+      wasAnimating.current ||
+      wasGrabbing.current ||
+      generation !== shadowGeneration.current
     wasAnimating.current = animating
+    wasGrabbing.current = grabbing
     shadowGeneration.current = generation
     if (dirty && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
   })

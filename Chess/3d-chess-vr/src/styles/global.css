@@ -79,7 +79,22 @@ body {
   z-index: 1;
 }
 
+/* The WebGL host sets these inline. Production CSP ignores inline styles, so the classes carry them. */
+.hall-stage > div {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.hall-stage > div > div {
+  width: 100%;
+  height: 100%;
+}
+
 .hall-stage canvas {
+  display: block;
   width: 100%;
   height: 100%;
 }

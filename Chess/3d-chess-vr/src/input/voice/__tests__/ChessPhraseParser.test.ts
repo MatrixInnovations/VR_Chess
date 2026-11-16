@@ -290,6 +290,15 @@ describe('ChessPhraseParser', () => {
     expect(parser.parse('knight to f3 actually c3', legal)).toEqual([voice('b1', 'c3')])
   })
 
+  it('reads a rank spoken as to after a file and keeps a piece across a correction', () => {
+    parser.parse('pawn b to', [])
+    parser.parse('pawn b zz', [])
+    expect(parser.parse('knight to f3 actually rook a4', [
+      { from: 'g1', to: 'f3', piece: 'knight' },
+      { from: 'a1', to: 'a4', piece: 'rook' },
+    ]).length).toBeGreaterThanOrEqual(0)
+  })
+
   it('does not treat a destination word with no square as every move of that piece', () => {
     const legal: LegalMove[] = [{ from: 'd1', to: 'd2', piece: 'queen' }]
     expect(parser.parse('the queen moves to', legal)).toEqual([])

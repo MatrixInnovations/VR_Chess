@@ -96,6 +96,7 @@ export function poseFromObject(object: Object3D): { origin: Vec3; direction: Vec
 /**
  * Project library input states into {@link XrPoseSource} values.
  * Controller and hand aim come from `targetRaySpace` when a frame is present.
+ * The returned array is reused every call. Copy a pose before the next frame if you keep it.
  * @param inputs - `inputSourceStates` from the XR store.
  * @param frame - Current XR frame, or null on the desktop.
  * @param referenceSpace - Session reference space passed to `getPose`.
@@ -120,8 +121,8 @@ export function readXrPoses(
     slot.hand = hand
     slot.selecting = Boolean(buttons?.[0]?.pressed)
     const aimed = aimOf(input, frame, referenceSpace)
-    const thumb = jointPosition(input, frame, referenceSpace, 'thumb-tip')
-    const indexTip = jointPosition(input, frame, referenceSpace, 'index-finger-tip')
+    const thumb = jointPosition(input, frame, referenceSpace, 'thumb-tip', thumbScratch)
+    const indexTip = jointPosition(input, frame, referenceSpace, 'index-finger-tip', indexScratch)
     slot.tracked = kind === 'hand' ? Boolean(thumb && indexTip) : Boolean(aimed)
     writeVec(slot.originStore, aimed?.origin ?? null, origin)
     writeVec(slot.directionStore, aimed?.direction ?? null, origin, true)
@@ -189,21 +190,21 @@ function aimOf(
 const rayOrigin = { x: 0, y: 0, z: 0 }
 const rayDirection = { x: 0, y: 0, z: -1 }
 const aimedPair = { origin: rayOrigin, direction: rayDirection }
-const jointScratch = { x: 0, y: 0, z: 0 }
+const thumbScratch = new Vector3()
+const indexScratch = new Vector3()
 
 function jointPosition(
   input: LooseXrInput,
   frame: XrFrameLike | null,
   referenceSpace: unknown,
   name: string,
-): Vec3 | null {
+  out: Vector3,
+): Vector3 | null {
   const joint = input.inputSource?.hand?.get(name)
   const pose = joint && frame?.getJointPose ? frame.getJointPose(joint, referenceSpace) : null
   if (!pose) return null
-  jointScratch.x = pose.transform.position.x
-  jointScratch.y = pose.transform.position.y
-  jointScratch.z = pose.transform.position.z
-  return jointScratch
+  out.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z)
+  return out
 }
 
 function rayFromTransform(transform: XrTransform): { origin: Vec3; direction: Vec3 } {

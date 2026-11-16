@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "tsx --test test/**/*.test.ts",
-    "test:coverage": "node --import tsx --experimental-test-coverage --test-coverage-include=src/**/*.ts --test-coverage-lines=90 --test-coverage-branches=75 --test test/**/*.test.ts"
+    "test:coverage": "node scripts/check-chess-clock-coverage.mjs"
   },
   "devDependencies": {
     "tsx": "4.20.6",
