@@ -244,6 +244,7 @@ export function marbleBakeSize(): number {
   return 2048
 }
 
+/** Inputs for one baked marble albedo. */
 export interface MarbleBakeOptions {
   size: number
   dark: boolean

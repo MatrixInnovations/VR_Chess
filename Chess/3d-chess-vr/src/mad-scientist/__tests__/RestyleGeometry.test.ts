@@ -192,7 +192,7 @@ describe('hall stage', () => {
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
     expect(bloom.strength).toBeCloseTo(0.15)
-    expect(bloom.threshold).toBeCloseTo(0.92)
+    expect(bloom.threshold).toBeCloseTo(0.95)
     expect((gl as { toneMapping?: number }).toneMapping).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)
