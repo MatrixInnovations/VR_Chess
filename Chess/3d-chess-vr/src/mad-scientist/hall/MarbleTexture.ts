@@ -116,6 +116,8 @@ function publish(data: Uint8Array, size: number): DataTexture {
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
   texture.encoding = sRGBEncoding
+  texture.flipY = false
+  texture.premultiplyAlpha = false
   texture.needsUpdate = true
   return texture
 }

@@ -97,11 +97,11 @@ export class PieceMaterialSet {
     this.scratch = scratch
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.08, 0.06, 1.8))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 1, 0.08, 0.06, 1.8))
     this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.1, 0.08, 1.35))
     this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 1.8))
     this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.35))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.08, 0.06, 1.8))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0x8d929b, 0.22, 0.7, 0.08, 0.06, 1.8))
     this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.1, 0.08, 1.35))
 
     this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 1.15))
@@ -110,9 +110,9 @@ export class PieceMaterialSet {
     this.put(
       'board:highlight',
       this.make({
-        color: 0xc9a227,
-        emissive: 0xc9a227,
-        emissiveIntensity: 0.22,
+        color: 0xf3e2a4,
+        emissive: 0xc9a44c,
+        emissiveIntensity: 0.9,
         roughness: 0.28,
         metalness: 0.35,
         clearcoat: 0.4,
@@ -276,19 +276,28 @@ export class PieceMaterialSet {
   }
 
   /**
-   * Desktop lets the reflector show through the marble and keeps micro-scratches.
-   * Quest uses opaque marble and constant metal roughness.
+   * A live mirror can show through the squares. Without one they stay opaque
+   * so light and dark marble still separate in the default view.
+   */
+  setMirrorBlend(enabled: boolean): void {
+    const light = this.boardSquare('light')
+    const dark = this.boardSquare('dark')
+    const opacity = enabled ? 0.94 : 1
+    light.opacity = opacity
+    dark.opacity = opacity
+    light.transparent = enabled
+    dark.transparent = enabled
+    light.depthWrite = !enabled
+    dark.depthWrite = !enabled
+  }
+
+  /**
+   * Desktop keeps micro-scratches. Quest uses constant metal roughness.
+   * Squares stay opaque until a mirror asks for a blend.
    */
   setTier(tier: 'desktop' | 'quest'): void {
     const desktop = tier === 'desktop'
-    const light = this.boardSquare('light')
-    const dark = this.boardSquare('dark')
-    light.opacity = desktop ? 0.82 : 1
-    dark.opacity = desktop ? 0.7 : 1
-    light.transparent = desktop
-    dark.transparent = desktop
-    light.depthWrite = !desktop
-    dark.depthWrite = !desktop
+    this.setMirrorBlend(false)
     for (const key of METAL_KEYS) {
       const material = this.table.get(key) as MeshPhysicalMaterial
       material.roughnessMap = desktop ? this.scratch.roughness : null

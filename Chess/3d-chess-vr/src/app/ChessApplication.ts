@@ -663,6 +663,8 @@ export class ChessApplication {
       y: event.clientY - rect.top,
       pointerId: event.pointerId,
     })
+    const orbit = this.runtime.hall.orbit
+    if (orbit) orbit.enabled = !this.runtime.grab.isGrabbing()
     this.bump()
   }
 

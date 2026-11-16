@@ -21,7 +21,7 @@ describe('PieceMaterialSet', () => {
     expect(white).not.toBe(black)
     expect(white.color.getHex()).not.toBe(black.color.getHex())
     expect(selected.emissiveIntensity).toBeGreaterThan(0)
-    expect(white.emissiveIntensity).toBe(0)
+    expect(white.emissiveIntensity).toBeGreaterThan(0)
     expect(dragging.transparent).toBe(true)
     expect(dragging.opacity).toBeLessThan(1)
   })

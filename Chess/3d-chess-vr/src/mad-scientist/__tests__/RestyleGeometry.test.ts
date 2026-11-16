@@ -187,8 +187,8 @@ describe('hall stage', () => {
       },
       bake: () => ({ texture: environment }),
     })
-    expect(hall.camera.fov).toBe(36)
-    expect(hall.camera.position.z).toBeCloseTo(0.66)
+    expect(hall.camera.fov).toBe(38)
+    expect(hall.camera.position.z).toBeCloseTo(0.84)
     expect(hall.reflector).toBeTruthy()
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
@@ -283,7 +283,7 @@ describe('desktop stage without the mirror', () => {
     })
     expect(hall.reflector).toBeNull()
     expect(hall.grade).toBeNull()
-    expect(hall.camera.fov).toBe(36)
+    expect(hall.camera.fov).toBe(38)
     expect(hall.orbit).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)

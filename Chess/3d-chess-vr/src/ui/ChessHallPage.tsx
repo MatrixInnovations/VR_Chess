@@ -30,12 +30,14 @@ export interface ChessHallPageProps {
  */
 export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const [model] = useState(() => app ?? ChessApplication.boot())
+  const [mounted, setMounted] = useState(false)
   const revision = useSyncExternalStore(
     (listener) => model.watch(listener),
     () => model.revision,
     () => 0,
   )
   useEffect(() => {
+    setMounted(true)
     if (typeof window === 'undefined') return undefined
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
     if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
@@ -161,7 +163,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         {snap.outcome ? ` · ${snap.outcome.status}` : ''}
       </p>
       <div className="hall-stage">
-        <Canvas
+        {mounted ? <Canvas
           dpr={typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent) ? 1 : [1, 1.5]}
           shadows="percentage"
           gl={{ preserveDrawingBuffer: true, antialias: true }}
@@ -197,7 +199,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
               <ChessHallView hall={model.runtime.hall} />
             </>
           )}
-        </Canvas>
+        </Canvas> : null}
       </div>
       <SiteCredit />
     </main>
@@ -231,7 +233,7 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     const orbit = model.runtime.hall.orbit
     if (orbit) {
       orbit.enabled = !grabbing
-      orbit.update()
+      if (!grabbing) orbit.update()
     }
     const grade = model.runtime.hall.grade
     if (grade) grade.render()

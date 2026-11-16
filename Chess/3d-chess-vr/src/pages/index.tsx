@@ -1,4 +1,6 @@
 import type { ReactElement } from 'react'
+import Head from 'next/head'
+
 import { AppMount } from '../scaffold/AppMount'
 
 /**
@@ -7,5 +9,12 @@ import { AppMount } from '../scaffold/AppMount'
  * @returns The foundation mount point.
  */
 export default function Home(): ReactElement {
-  return <AppMount />
+  return (
+    <>
+      <Head>
+        <title>Chess Hall</title>
+      </Head>
+      <AppMount />
+    </>
+  )
 }

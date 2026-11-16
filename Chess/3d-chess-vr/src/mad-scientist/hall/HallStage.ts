@@ -89,6 +89,7 @@ export function configureHallStage(
       const reflector = createBoardReflector()
       hall.board.object.add(reflector)
       hall.reflector = reflector
+      hall.materials.setMirrorBlend(true)
       const composer = new EffectComposer(gl)
       composer.addPass(new RenderPass(scene, camera))
       composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.95))
@@ -114,6 +115,7 @@ export function configureHallStage(
   xr?.addEventListener?.('sessionend', () => {
     if (quest) return
     hall.setTier('desktop')
+    if (hall.reflector) hall.materials.setMirrorBlend(true)
     hall.grade = desktopGrade
     scene.fog = desktopFog
     if (hall.orbit) hall.orbit.enabled = true
