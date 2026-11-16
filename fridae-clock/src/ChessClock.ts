@@ -623,14 +623,31 @@ export class ChessClock {
   hold(): void {
     this.assertLive()
     if (this.terminal) return
-    if (this.running) {
-      const left = this.readBankMillis(this.active)
-      if (this.active === "white") this.whiteMs = left
-      else this.blackMs = left
-    }
+    this.foldActiveBank()
     this.running = false
     this.held = true
     this.phase = "armed"
+  }
+
+  /**
+   * Stop a running countdown and leave the clock armed, not held.
+   * A later server replacement can start it. A fresh armed clock stays armed.
+   */
+  standDown(): void {
+    this.assertLive()
+    if (this.terminal) return
+    this.foldActiveBank()
+    this.running = false
+    this.held = false
+    this.phase = "armed"
+  }
+
+  /** Fold the running side's displayed time back into its bank. */
+  private foldActiveBank(): void {
+    if (!this.running) return
+    const left = this.readBankMillis(this.active)
+    if (this.active === "white") this.whiteMs = left
+    else this.blackMs = left
   }
 
   /**

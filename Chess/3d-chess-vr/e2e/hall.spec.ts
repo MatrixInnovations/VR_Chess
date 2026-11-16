@@ -1,9 +1,6 @@
 import { expect, test } from '@playwright/test'
 
 test('pass and play moves the clock and the immersive switch keeps the session', async ({ page }) => {
-  await page.addInitScript(() => {
-    ;(window as Window & { __E2E__?: boolean }).__E2E__ = true
-  })
   await page.goto('/')
   await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
   await page.waitForTimeout(600)

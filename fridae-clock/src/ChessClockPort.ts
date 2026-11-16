@@ -99,6 +99,7 @@ export class ChessClockPort implements IClockPort {
    * @param event - `gameFull`, `gameState`, or another stream line.
    */
   receive(generation: number, event: LichessBoardStreamEvent): void {
+    if (generation > this.generation) this.generation = generation
     this.synchronizer.receive(generation, event)
   }
 
@@ -142,6 +143,7 @@ export class ChessClockPort implements IClockPort {
     this.ply = 0
     this.moveSerial = 0
     if (config.whiteMs === 0 && config.blackMs === 0) {
+      this.chessClock.standDown()
       return this.reading()
     }
     this.chessClock.rearm({

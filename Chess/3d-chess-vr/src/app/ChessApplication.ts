@@ -518,9 +518,28 @@ export class ChessApplication {
     this.bump()
   }
 
-  /** Open the lobby from a stored session and redraw. */
+  /** Open the lobby from a stored session and redraw. Signed-out players see sign-in. */
   openLobby(): void {
     this.shell.signIn.continueWithSession()
+    if (this.shell.authPresenter.snapshot().phase === 'denied') this.shell.navigator.showSignIn()
+    this.bump()
+  }
+
+  /** Seek from the lobby and redraw after the request settles. */
+  async seekFromLobby(): Promise<void> {
+    await this.shell.lobby.seek()
+    this.bump()
+  }
+
+  /** Challenge from the lobby and redraw after the request settles. */
+  async challengeFromLobby(): Promise<void> {
+    await this.shell.lobby.challenge()
+    this.bump()
+  }
+
+  /** Pass and play from the lobby and redraw. */
+  passAndPlayFromLobby(): void {
+    this.shell.lobby.startOfflineDemo()
     this.bump()
   }
 
@@ -536,15 +555,15 @@ export class ChessApplication {
     this.bump()
   }
 
-  /** Cancel a seek or challenge and redraw. */
-  cancelWait(): void {
-    void this.shell.waiting.cancel()
+  /** Cancel a seek or challenge and redraw after the request settles. */
+  async cancelWait(): Promise<void> {
+    await this.shell.waiting.cancel()
     this.bump()
   }
 
-  /** Ask the error screen to try the stream again and redraw. */
-  retryConnection(): void {
-    void this.shell.errors.retry()
+  /** Ask the error screen to try the stream again and redraw after it settles. */
+  async retryConnection(): Promise<void> {
+    await this.shell.errors.retry()
     this.bump()
   }
 
@@ -686,6 +705,7 @@ export class ChessApplication {
     this.host.attach(session)
     this.viewPort = session.asViewPort()
     this.modes = new ViewModeManager(this.viewPort, this.readModel, this.modes.mode)
+    this.host.setView(this.modes.mode.isImmersive() ? 'immersive' : 'seated')
     this.toggle = new ModeToggleControl(this.modes, {
       isXrAvailable: () => {
         const probe = this.xr as { isSupported?: () => boolean }

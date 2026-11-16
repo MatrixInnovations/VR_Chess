@@ -92,6 +92,8 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
   private pendingPly = 0;
   /** When set, a `gameStart` for any other id is someone else's ongoing game. */
   private expectedGameId: string | null = null;
+  /** One Board API socket for this session. finish() uses a later generation. */
+  private readonly clockGeneration = 1;
   /** Move list we have already estimated a clock for. A shorter stream prefix must not rewind it. */
   private optimisticMoves: readonly string[] = [];
   private lastTakebackKey = '';
@@ -617,10 +619,12 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
       this.clocks = { whiteMs: state.wtime, blackMs: state.btime, whiteIncMs: state.winc, blackIncMs: state.binc };
       this.whiteOfferingDraw = state.wdraw;
       this.blackOfferingDraw = state.bdraw;
-      this.clock?.sync(
-        { whiteMs: state.wtime, blackMs: state.btime, sideToMove: this.rules.turn() },
-        this.now(),
-      );
+      if (!this.pushClockStream(full, state)) {
+        this.clock?.sync(
+          { whiteMs: state.wtime, blackMs: state.btime, sideToMove: this.rules.turn() },
+          this.now(),
+        );
+      }
       this.optimisticMoves = [...state.moves];
       this.clockProvisional = state.wtime === 0 || state.btime === 0;
     }
@@ -643,6 +647,36 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
    * Applying that event's `wtime` / `btime` would put the clock back on the side that just moved.
    * @param incoming - Move list on the stream event.
    */
+  /**
+   * Hand the stream line to the clock port when it understands generations.
+   * @returns True when the port accepted the line, so `sync` must not also run.
+   */
+  private pushClockStream(full: boolean, state: import('../lichess/apiTypes').GameStatePayload): boolean {
+    const receiver = this.clock as { receive?: (generation: number, event: object) => void } | null;
+    if (!receiver?.receive) return false;
+    const moves = state.moves.join(' ');
+    const fields = {
+      moves,
+      wtime: state.wtime,
+      btime: state.btime,
+      winc: state.winc,
+      binc: state.binc,
+      status: state.status,
+      winner: state.winner,
+    };
+    if (full) {
+      receiver.receive(this.clockGeneration, {
+        type: 'gameFull',
+        initialFen: this.initialFen,
+        clock: { initial: Math.max(state.wtime, state.btime), increment: state.winc },
+        state: fields,
+      });
+      return true;
+    }
+    receiver.receive(this.clockGeneration, { type: 'gameState', ...fields });
+    return true;
+  }
+
   private clockTimesAreStale(incoming: readonly string[]): boolean {
     const optimistic = this.optimisticMoves;
     if (incoming.length >= optimistic.length) return false;

@@ -55,7 +55,8 @@ describe('ChessJsRules', () => {
     expect(kingside.play({ from: 'e1', to: 'g1' })?.uci).toBe('e1g1');
     const queenside = new ChessJsRules('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
     expect(queenside.play({ from: 'e1', to: 'c1' })?.uci).toBe('e1c1');
-    const throughCheck = new ChessJsRules('4q3/8/8/8/8/8/8/R3K2R w KQ - 0 1');
+    const throughCheck = new ChessJsRules('r3k2r/8/b7/8/8/8/8/R3K2R w KQkq - 0 1');
+    expect(throughCheck.play({ from: 'a1', to: 'a2' })).not.toBeNull();
     expect(throughCheck.play({ from: 'e1', to: 'g1' })).toBeNull();
 
     const enPassant = new ChessJsRules('rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3');
@@ -68,7 +69,7 @@ describe('ChessJsRules', () => {
   it('replays an underpromotion and recognises threefold, the 50-move rule, and insufficient material', () => {
     const promoted = new ChessJsRules();
     expect(promoted.replay('k7/4P3/8/8/8/8/8/4K3 w - - 0 1', ['e7e8n'])).toBe(true);
-    expect(promoted.fen().toLowerCase()).toContain('n');
+    expect(promoted.fen().startsWith('k3N3')).toBe(true);
 
     const repeated = new ChessJsRules();
     expect(
@@ -76,7 +77,7 @@ describe('ChessJsRules', () => {
     ).toBe(true);
     expect(repeated.isDraw()).toBe(true);
 
-    expect(new ChessJsRules('k7/8/8/8/8/8/8/K7 w - - 100 60').isDraw()).toBe(true);
+    expect(new ChessJsRules('4k3/8/8/8/8/8/8/4K2R w - - 100 80').isDraw()).toBe(true);
     expect(new ChessJsRules('k7/8/8/8/8/8/8/K7 w - - 0 1').isDraw()).toBe(true);
   });
 

@@ -204,6 +204,34 @@ export class LichessClient {
    * @param token - Bearer token.
    * @param signal - Abort signal.
    */
+  /**
+   * `GET /api/account/playing`. Ids already in progress must not be adopted as a new seek.
+   * @param token - Bearer token.
+   * @param signal - Abort signal.
+   * @returns Game ids, or an empty list when the payload is unusable.
+   */
+  async listPlaying(token: string, signal: AbortSignal): Promise<readonly string[]> {
+    const result = await this.request(token, 'GET', `${ORIGIN}/api/account/playing`, undefined, signal, false);
+    if (!result.ok) return [];
+    try {
+      const body = JSON.parse(result.text) as { nowPlaying?: unknown };
+      if (!Array.isArray(body.nowPlaying)) return [];
+      return body.nowPlaying.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') return [];
+        const gameId = (entry as { gameId?: unknown }).gameId;
+        return typeof gameId === 'string' && gameId.length > 0 ? [gameId] : [];
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * `GET /api/account`.
+   * @param token - Bearer token.
+   * @param signal - Abort signal.
+   * @returns The account, or a transport failure.
+   */
   async getAccount(token: string, signal: AbortSignal): Promise<AccountResult> {
     const result = await this.request(token, 'GET', `${ORIGIN}/api/account`, undefined, signal, false);
     if (!result.ok) return { ok: false, result: result.error };
@@ -337,6 +365,9 @@ export class LichessClient {
           handle,
           kind,
           terminal,
+          () => {
+            resumes = 0;
+          },
         );
         terminal = outcome.terminal;
         if (outcome.healthy) resumes = 0;
@@ -372,6 +403,7 @@ export class LichessClient {
     handle: StreamHandle<T>,
     kind: 'board' | 'incoming',
     alreadyTerminal: boolean,
+    onData: () => void = () => undefined,
   ): Promise<{ terminal: boolean; healthy: boolean }> {
     let terminal = alreadyTerminal;
     let healthy = false;
@@ -400,6 +432,7 @@ export class LichessClient {
     const reading = (async (): Promise<void> => {
       await this.consume(response.body as AsyncIterable<Uint8Array>, signal, (chunk) => {
         healthy = true;
+        onData();
         deliver(decoder.push(chunk));
       });
       deliver(decoder.end());

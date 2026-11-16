@@ -18,8 +18,13 @@ class MockTransport implements IHttpTransport {
   readonly sent: HttpRequest[] = [];
   readonly handlers: Array<(request: HttpRequest) => Promise<HttpResponse> | HttpResponse> = [];
 
+  playing: readonly { gameId: string }[] = [];
+
   async send(request: HttpRequest): Promise<HttpResponse> {
     this.sent.push(request);
+    if (request.url.includes('/api/account/playing')) {
+      return json({ nowPlaying: this.playing });
+    }
     const handler = this.handlers.shift();
     if (!handler) throw new Error(`unexpected ${request.method} ${request.url}`);
     return handler(request);
@@ -81,7 +86,8 @@ describe('LichessPlayer', () => {
     const urls = transport.sent.map((entry) => entry.url);
     expect(urls[0]).toContain('/api/account');
     expect(urls[1]).toContain('/api/stream/event');
-    expect(urls[2]).toContain('/api/board/seek');
+    expect(urls[2]).toContain('/api/account/playing');
+    expect(urls[3]).toContain('/api/board/seek');
     expect(urls.some((url) => url.includes('/move/'))).toBe(false);
     session.dispose();
     await pending;
@@ -124,12 +130,14 @@ describe('LichessPlayer', () => {
     const encoder = new TextEncoder();
     let followUp = '';
     let closed = false;
+    transport.playing = [{ gameId: 'oldGame1' }];
     transport.handlers.push(async () => json({ id: 'ada', username: 'Ada' }));
     transport.handlers.push(async () => ({
       status: 200,
       headers: {},
       text: async () => '',
       body: (async function* body() {
+        await new Promise((resolve) => setTimeout(resolve, 60));
         yield encoder.encode(
           '{"type":"gameStart","game":{"id":"oldGame1","color":"white","compat":{"board":true}}}\n',
         );

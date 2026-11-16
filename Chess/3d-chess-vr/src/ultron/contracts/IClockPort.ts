@@ -46,6 +46,12 @@ export interface IClockPort {
    * @param winner - Winner, or null for a draw.
    */
   finish?(status: string, winner: Color | null): void;
+  /**
+   * Apply one Board API stream line. Generations are shared with {@link finish}.
+   * @param generation - Socket generation. A later finish uses a higher one.
+   * @param event - `gameFull` or `gameState`.
+   */
+  receive?(generation: number, event: object): void;
   /** Release timers. */
   dispose(): void;
 }

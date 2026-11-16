@@ -474,6 +474,69 @@ describe('online GameSession', () => {
     const accepted = await session.acceptChallenge('ch1');
     expect(accepted.ok).toBe(true);
   });
+
+  it('calls clock.finish before clock.stop when the server ends the game', () => {
+    const order: string[] = [];
+    const clock: IClockPort = {
+      sync: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      onMovePlayed: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      read: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      arm: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      finish: (status) => {
+        order.push(`finish:${status}`);
+      },
+      stop: () => {
+        order.push('stop');
+      },
+      dispose: () => undefined,
+    };
+    const player = new FakeOnlinePlayer();
+    const session = GameSession.online({
+      rules: new ChessJsRules(),
+      ids: new SequentialIds('s'),
+      now: () => 0,
+      sessionId: 'finish-order',
+      player,
+      clock,
+    });
+    arm(session, player);
+    player.inbox?.onBoardEvent(state('e2e4', 'resign'));
+    expect(order).toEqual(['finish:resign', 'stop']);
+  });
+
+  it('feeds gameFull and gameState to clock.receive and does not also sync', () => {
+    const received: Array<{ generation: number; type: string }> = [];
+    let syncs = 0;
+    const clock: IClockPort = {
+      sync: () => {
+        syncs += 1;
+        return { whiteMs: 1, blackMs: 1, flagged: null };
+      },
+      onMovePlayed: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      read: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      arm: () => ({ whiteMs: 1, blackMs: 1, flagged: null }),
+      receive: (generation, event) => {
+        received.push({ generation, type: String((event as { type?: string }).type) });
+      },
+      finish: () => undefined,
+      stop: () => undefined,
+      dispose: () => undefined,
+    };
+    const player = new FakeOnlinePlayer();
+    const session = GameSession.online({
+      rules: new ChessJsRules(),
+      ids: new SequentialIds('s'),
+      now: () => 0,
+      sessionId: 'clock-receive',
+      player,
+      clock,
+    });
+    arm(session, player);
+    player.inbox?.onBoardEvent(state('e2e4'));
+    expect(received.map((line) => line.type)).toEqual(['gameFull', 'gameState']);
+    expect(received.every((line) => line.generation === 1)).toBe(true);
+    expect(syncs).toBe(0);
+  });
 });
 
 class RecordingClock implements IClockPort {

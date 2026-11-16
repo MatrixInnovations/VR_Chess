@@ -144,6 +144,114 @@ describe("ChessClockPort Ultron IClockPort", () => {
     assert.equal(kept.blackMs, 10_000)
   })
 
+  it("confirms an online timeout, freezes a resignation, and ignores a second finish", () => {
+    const port = new ChessClockPort("online")
+    port.arm({ whiteMs: 1_000, blackMs: 9_000, incrementMs: 0 }, "white", 0)
+    port.read(2_000)
+    port.finish("outoftime", "black")
+    const flagged = port.read(2_000)
+    assert.equal(flagged.flagged, "white")
+    const snap = port.chessClock.snapshot()
+    assert.equal(snap.confirmedFlag?.source, "server")
+    assert.equal(snap.provisionalFlagColor, null)
+    assert.equal(snap.phase, "frozen")
+    const resign = new ChessClockPort("online")
+    resign.arm({ whiteMs: 30_000, blackMs: 30_000, incrementMs: 0 }, "white", 0)
+    resign.finish("resign", "black")
+    assert.equal(resign.read(0).flagged, null)
+    assert.equal(resign.chessClock.snapshot().phase, "frozen")
+    resign.finish("mate", "white")
+    assert.equal(resign.chessClock.snapshot().lichessStatus, "resign")
+  })
+
+  it("keeps a 0/0 online arm waiting, and stops a clock that was already running", () => {
+    const waiting = new ChessClockPort("online")
+    const events: string[] = []
+    waiting.chessClock.subscribe((event) => events.push(event.type))
+    waiting.arm({ whiteMs: 0, blackMs: 0, incrementMs: 0 }, "white", 0)
+    assert.equal(events.includes("provisionalFlag"), false)
+    assert.equal(waiting.chessClock.snapshot().phase, "armed")
+    assert.equal(waiting.read(5_000).flagged, null)
+    waiting.sync({ whiteMs: 60_000, blackMs: 60_000, sideToMove: "white" }, 5_000)
+    assert.equal(waiting.chessClock.snapshot().phase, "running")
+
+    const running = new ChessClockPort("online")
+    running.arm({ whiteMs: 10_000, blackMs: 10_000, incrementMs: 0 }, "black", 0)
+    running.read(1_000)
+    assert.equal(running.chessClock.snapshot().phase, "running")
+    running.arm({ whiteMs: 0, blackMs: 0, incrementMs: 0 }, "white", 1_000)
+    assert.equal(running.chessClock.snapshot().phase, "armed")
+    assert.equal(running.chessClock.snapshot().terminal, false)
+    running.sync({ whiteMs: 20_000, blackMs: 20_000, sideToMove: "white" }, 1_000)
+    assert.equal(running.read(2_000).whiteMs, 19_000)
+  })
+
+  it("uses the stream generation for a later finish so the flag is not stale", () => {
+    const port = new ChessClockPort("online")
+    port.receive(4, {
+      type: "gameFull",
+      initialFen: "startpos",
+      clock: { initial: 60_000, increment: 0 },
+      state: {
+        moves: "",
+        wtime: 1_000,
+        btime: 60_000,
+        winc: 0,
+        binc: 0,
+        status: "started",
+        winner: null,
+      },
+    })
+    port.read(2_000)
+    port.finish("outoftime", "black")
+    assert.equal(port.read(2_000).flagged, "white")
+    assert.equal(port.chessClock.snapshot().phase, "frozen")
+  })
+
+  it("does not finish an offline clock and keeps correspondence kind on a server finish", () => {
+    const offline = new ChessClockPort("offline")
+    offline.arm({ whiteMs: 10_000, blackMs: 10_000, incrementMs: 0 }, "white", 0)
+    offline.finish("resign", "black")
+    assert.equal(offline.chessClock.snapshot().phase, "running")
+    const correspondence = new ChessClockPort("online")
+    correspondence.receive(2, {
+      type: "gameFull",
+      initialFen: "startpos",
+      daysPerTurn: 3,
+      state: {
+        moves: "",
+        wtime: 86_400_000,
+        btime: 86_400_000,
+        winc: 0,
+        binc: 0,
+        status: "started",
+        winner: null,
+      },
+    })
+    correspondence.receive(1, { type: "chatLine", text: "hi" })
+    correspondence.finish("resign", null)
+    assert.equal(correspondence.chessClock.snapshot().kind, "correspondence")
+    assert.equal(correspondence.chessClock.snapshot().phase, "frozen")
+    const unlimited = new ChessClockPort("online")
+    unlimited.receive(1, {
+      type: "gameFull",
+      initialFen: "startpos",
+      state: {
+        moves: "",
+        wtime: 1_000,
+        btime: 1_000,
+        winc: 0,
+        binc: 0,
+        status: "started",
+        winner: null,
+      },
+    })
+    unlimited.read(0)
+    unlimited.finish("mate", "white")
+    assert.equal(unlimited.chessClock.snapshot().kind, "unlimited")
+    assert.equal(unlimited.read(0).flagged, null)
+  })
+
   it("dispose rejects later reads", () => {
     const port = new ChessClockPort("offline")
     port.arm({ whiteMs: 1_000, blackMs: 1_000, incrementMs: 0 }, "white", 0)

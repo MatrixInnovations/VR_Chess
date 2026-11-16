@@ -33,10 +33,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
-    const expose =
-      process.env.NODE_ENV !== 'production' ||
-      (window as Window & { __E2E__?: boolean }).__E2E__ === true
-    if (expose) global.__CHESS_APP__ = model
+    if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
     void model.completeRedirectIfPresent(window.location.href)
     return () => {
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
@@ -299,7 +296,7 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
       <h2>Find a game</h2>
       <p>Time control {props.time}. Seeks are rapid or classical.</p>
       {props.message ? <p>{props.message}</p> : null}
-      <button type="button" onClick={() => void props.model.shell.lobby.seek()}>
+      <button type="button" onClick={() => void props.model.seekFromLobby()}>
         Seek {props.time}
       </button>
       <label>
@@ -309,10 +306,10 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
           props.model.shell.lobbyPresenter.setOpponent(event.target.value)
         }} />
       </label>
-      <button type="button" onClick={() => void props.model.shell.lobby.challenge()}>
+      <button type="button" onClick={() => void props.model.challengeFromLobby()}>
         Challenge
       </button>
-      <button type="button" onClick={() => props.model.shell.lobby.startOfflineDemo()}>
+      <button type="button" onClick={() => props.model.passAndPlayFromLobby()}>
         Pass and play
       </button>
       <button type="button" onClick={() => props.model.backToBoard()}>

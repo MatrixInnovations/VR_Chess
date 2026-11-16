@@ -27,6 +27,9 @@ class MockTransport implements IHttpTransport {
 
   async send(request: HttpRequest): Promise<HttpResponse> {
     this.sent.push(request);
+    if (request.url.includes('/api/account/playing')) {
+      return json(200, { nowPlaying: [] });
+    }
     const handler = this.handlers.shift();
     if (!handler) throw new Error(`unexpected ${request.url}`);
     return handler(request);

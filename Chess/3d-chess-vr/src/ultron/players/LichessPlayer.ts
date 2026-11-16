@@ -19,7 +19,6 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
   private activeGameId: string | null = null;
   /** Games already running when the stream opened. A new seek must not join them. */
   private readonly foreignGames = new Set<string>();
-  private baselining = false;
   private acceptNewGame = false;
   private starting: Promise<TransportResult> | null = null;
   private accountLabel = 'Lichess';
@@ -152,18 +151,18 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
   }
 
   /**
-   * Open the event stream, remember games that are already running, then accept the next new one.
-   * The short wait lets the initial `gameStart` burst arrive before a seek is posted.
+   * Open the event stream, ignore games already in `/api/account/playing`, then adopt the new one.
+   * A `gameStart` for an ongoing game is ignored even when it arrives after the seek is posted.
    */
   private async prepareForNewGame(signal: AbortSignal): Promise<TransportResult> {
     const ready = await this.ensureStarted(signal);
     if (!ready.ok) return ready;
-    if (!this.acceptNewGame) {
-      this.baselining = true;
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      this.baselining = false;
-      this.acceptNewGame = true;
+    const token = this.tokens.getAccessToken();
+    if (token) {
+      const playing = await this.client.listPlaying(token, signal);
+      for (const gameId of playing) this.foreignGames.add(gameId);
     }
+    this.acceptNewGame = true;
     this.activeGameId = null;
     return ready;
   }
@@ -195,11 +194,8 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
     const opened = this.client.openEventStream(token, this.events.signal, {
       onEvent: (event) => {
         if (event.type === 'gameStart') {
-          if (this.baselining || this.foreignGames.has(event.gameId)) {
-            this.foreignGames.add(event.gameId);
-            return;
-          }
-          if (this.activeGameId && this.activeGameId !== event.gameId) return;
+          if (this.foreignGames.has(event.gameId)) return;
+          if (this.acceptNewGame && this.activeGameId && this.activeGameId !== event.gameId) return;
           this.inbox?.onIncoming(event);
           this.watchGame(token, event.gameId);
           return;

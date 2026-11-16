@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { XrSessionPort } from './XrSessionPort'
 import { ChessApplication } from './ChessApplication'
@@ -12,14 +12,20 @@ class FakeXr implements XrSessionPort {
   vr = 0
   ended = 0
 
+  ar = false
+
   async enterVR(): Promise<boolean> {
     this.vr += 1
     return true
   }
 
   async enterAR(): Promise<boolean> {
-    this.lastError = 'no ar'
-    return false
+    if (!this.ar) {
+      this.lastError = 'no ar'
+      return false
+    }
+    this.lastError = ''
+    return true
   }
 
   async exit(): Promise<void> {
@@ -134,7 +140,7 @@ describe('ChessApplication pass and play', () => {
     expect(spoken.app.game.snapshot.moves).toEqual([])
   })
 
-  it('redraws the sign-in screen and the clock when a second passes', () => {
+  it('redraws the sign-in screen and the clock when a second passes', async () => {
     let time = 0
     const { app: hall } = app(() => time)
     const opened = hall.revision
@@ -149,8 +155,70 @@ describe('ChessApplication pass and play', () => {
     hall.frame(time)
     expect(hall.revision).toBeGreaterThan(painted)
     hall.backToLobby()
-    hall.cancelWait()
-    void hall.retryConnection()
+    await hall.cancelWait()
+    await hall.retryConnection()
+  })
+
+  it('advances from performance.now and opens sign-in when the lobby is requested signed out', () => {
+    const perf = vi.spyOn(performance, 'now')
+    const wall = vi.spyOn(Date, 'now')
+    perf.mockReturnValue(1_000)
+    wall.mockReturnValue(9_000_000_000_000)
+    const xr = new FakeXr()
+    const hall = new ChessApplication({
+      xr,
+      whiteMs: 60_000,
+      blackMs: 60_000,
+      incrementMs: 0,
+      transport: new DeadTransport(),
+      storage: new MemoryKeyValueStore(),
+    })
+    perf.mockReturnValue(2_500)
+    wall.mockReturnValue(9_000_000_000_000)
+    hall.frame()
+    const left = hall.clockView.present().white.remainingMs
+    expect(left).toBeLessThan(60_000)
+    expect(left).toBeGreaterThan(50_000)
+    hall.openLobby()
+    expect(hall.shell.navigator.screen.name).toBe('sign-in')
+    perf.mockRestore()
+    wall.mockRestore()
+  })
+
+  it('resigns, offers a draw, listens, and leaves immersive mode', async () => {
+    const xr = new FakeXr()
+    const hall = new ChessApplication({
+      xr,
+      speech: new WebSpeechRecognitionAdapter(new ScriptFactory()),
+      whiteMs: 60_000,
+      blackMs: 60_000,
+      incrementMs: 0,
+      transport: new DeadTransport(),
+      storage: new MemoryKeyValueStore(),
+    })
+    expect(hall.playAlgebraic('e2', 'e4')).toBe(true)
+    await hall.resign()
+    await hall.offerDraw()
+    await hall.offerDraw()
+    await hall.declineDraw()
+    await hall.listen()
+    expect(hall.message.length).toBeGreaterThan(0)
+    await hall.stopListening()
+    await hall.toggleImmersive()
+    expect(hall.presentation).toBe('immersive')
+    await hall.toggleImmersive()
+    expect(hall.presentation).not.toBe('immersive')
+    await hall.enterPassthrough()
+    expect(hall.message).toMatch(/no ar/)
+    xr.ar = true
+    await hall.enterPassthrough()
+    expect(hall.message).toMatch(/Passthrough/)
+    await hall.completeRedirectIfPresent('not a url')
+    await hall.completeRedirectIfPresent('https://play.example/hall?code=abc&state=xyz')
+    hall.tourNext()
+    hall.tourSkip()
+    hall.toggleMenu()
+    hall.toggleMenu()
   })
 })
 
