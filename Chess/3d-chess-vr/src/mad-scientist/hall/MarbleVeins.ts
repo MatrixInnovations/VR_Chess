@@ -52,10 +52,10 @@ float marbleVeinAmt(vec2 uv, vec2 tile) {
   p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) + 0.5;
   p += vec2(hash11(seed), hash11(seed + 7.1)) * 0.35;
   float q = fbm(p * 2.4 + seed);
-  vec2 w = p + 0.45 * vec2(q, fbm(p * 2.4 + 19.2));
-  float rid = 1.0 - abs(snoise(w * 4.8 + seed));
+  vec2 w = p + 0.22 * vec2(q, fbm(p * 2.4 + 19.2));
+  float rid = 1.0 - abs(snoise(w * 3.6 + seed));
   float vein = pow(smoothstep(0.72, 0.98, rid), 1.8);
-  vein += 0.45 * pow(smoothstep(0.80, 0.98, 1.0 - abs(snoise(w * 9.6))), 2.2);
+  vein += 0.18 * pow(smoothstep(0.80, 0.98, 1.0 - abs(snoise(w * 7.2))), 2.2);
   return vein;
 }
 vec3 srgbToLinear(vec3 c) { return pow(c, vec3(2.2)); }
@@ -68,7 +68,7 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark) {
   p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) + 0.5;
   p += vec2(hash11(seed), hash11(seed + 7.1)) * 0.35;
   float q = fbm(p * 2.4 + seed);
-  vec2 w = p + 0.45 * vec2(q, fbm(p * 2.4 + 19.2));
+  vec2 w = p + 0.22 * vec2(q, fbm(p * 2.4 + 19.2));
   float body = fbm(w * 3.2);
   float vein = marbleVeinAmt(uv, tile);
   vec3 color;
@@ -77,7 +77,7 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark) {
     vec3 veinC = mix(srgbToLinear(vec3(0.290, 0.271, 0.243)), srgbToLinear(vec3(0.416, 0.396, 0.361)), smoothstep(0.55, 1.0, vein));
     color = mix(base, veinC, clamp(vein * 0.85, 0.0, 1.0));
   } else {
-    vec3 base = mix(srgbToLinear(vec3(0.941, 0.922, 0.890)), srgbToLinear(vec3(0.886, 0.867, 0.839)), body * 0.15);
+    vec3 base = mix(srgbToLinear(vec3(0.941, 0.922, 0.890)), srgbToLinear(vec3(0.886, 0.867, 0.839)), body * 0.06);
     color = mix(base, srgbToLinear(vec3(0.431, 0.416, 0.392)), clamp(vein, 0.0, 1.0));
   }
   return color;

@@ -50,7 +50,7 @@ export class PhysicalChessClock {
     this.body = new Mesh(bodyGeo, this.materials.body)
     this.body.rotation.x = -Math.PI / 2
     this.body.position.y = 0.02
-    this.body.castShadow = true
+    this.body.castShadow = false
     this.body.receiveShadow = true
     this.body.userData.msRole = 'clock'
     const rimGeo = new PlaneGeometry(0.172, 0.082)

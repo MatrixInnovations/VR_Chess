@@ -37,8 +37,12 @@ describe('PieceMaterialSet', () => {
     const creamCoat = cream as MeshPhysicalMaterial
     const marbleCoat = marble as MeshPhysicalMaterial
     expect(cream).not.toBe(marble)
-    expect(cream.color.getHex()).toBe(0xf0ebe3)
-    expect(marble.color.getHex()).toBe(0x0b0b0c)
+    expect(cream.color.getHex()).toBe(0xffffff)
+    expect(marble.color.getHex()).toBe(0xffffff)
+    const creamPixel = (cream.map as { image: { data: Uint8Array } }).image.data
+    const marblePixel = (marble.map as { image: { data: Uint8Array } }).image.data
+    expect(creamPixel[0]).toBeGreaterThan(180)
+    expect(marblePixel[0]).toBeLessThan(80)
     expect(cream.metalness).toBe(0)
     expect(marble.metalness).toBe(0)
     expect(cream.roughness).toBeCloseTo(0.16)
@@ -49,7 +53,7 @@ describe('PieceMaterialSet', () => {
     expect(black.metalness).toBe(1)
     expect(white.roughness).toBeCloseTo(0.08)
     expect(black.roughness).toBeCloseTo(0.12)
-    expect(black.envMapIntensity).toBeCloseTo(1.6)
+    expect(black.envMapIntensity).toBeCloseTo(1.35)
     expect(white.color.getHex()).toBe(0xd4d7dc)
     expect(black.color.getHex()).toBe(0xc06a38)
     expect(white.roughnessMap).toBeTruthy()

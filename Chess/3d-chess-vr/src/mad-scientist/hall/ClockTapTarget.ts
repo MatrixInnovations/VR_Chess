@@ -34,7 +34,7 @@ export class ClockTapTarget {
     this.object.name = 'clock-tap-target'
     this.object.position.set(position.x, position.y, position.z)
     this.object.userData.msRole = 'clock'
-    this.object.castShadow = true
+    this.object.castShadow = false
   }
 
   /** Replace the tap handler. Pass null to clear it. */

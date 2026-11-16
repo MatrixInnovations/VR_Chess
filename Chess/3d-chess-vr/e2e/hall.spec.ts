@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { pngStats } from './pngStats'
+
 test('pass and play moves the clock and the immersive switch keeps the session', async ({ page }) => {
   await page.goto('/')
   await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
@@ -39,13 +41,7 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await expect(page.getByTestId('session-id')).toHaveText(before)
   await expect(page.getByTestId('clock-active')).toHaveText('black')
   await page.waitForSelector('canvas[data-frame="1"]')
-  const sample = await page.evaluate(() => {
-    const canvas = document.querySelector('canvas')
-    return {
-      mean: Number(canvas?.dataset.mean ?? 0),
-      variance: Number(canvas?.dataset.variance ?? 0),
-    }
-  })
+  const sample = pngStats(await page.locator('canvas').screenshot())
   expect(sample.mean).toBeGreaterThan(12)
   expect(sample.variance).toBeGreaterThan(4)
 })

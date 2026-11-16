@@ -91,7 +91,6 @@ export class HallLighting {
       this.fill.target,
       this.rim,
       this.rim.target,
-      this.rect,
       this.sconceLeft,
       this.sconceRight,
     )
@@ -108,7 +107,7 @@ export class HallLighting {
    */
   setTier(tier: 'desktop' | 'quest'): void {
     const desktop = tier === 'desktop'
-    this.key.intensity = desktop ? 1.05 : 0.95
+    this.key.intensity = desktop ? 1.35 : 0.95
     this.key.shadow.mapSize.set(desktop ? 1024 : 512, desktop ? 1024 : 512)
     this.key.shadow.normalBias = desktop ? 0.012 : 0.01
     const span = desktop ? 0.7 : 0.6
@@ -119,6 +118,8 @@ export class HallLighting {
     camera.bottom = -span
     camera.updateProjectionMatrix()
     this.rect.intensity = desktop ? 0.7 : 0
+    if (desktop) this.object.add(this.rect)
+    else this.rect.removeFromParent()
   }
 
   /** Remove the lights from their parent. */

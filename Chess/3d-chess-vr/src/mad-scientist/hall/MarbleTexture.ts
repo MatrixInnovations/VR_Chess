@@ -236,3 +236,84 @@ export function scratchMaps(): { roughness: DataTexture; normal: DataTexture } {
 
 /** Keeps the texture type in the public signature without importing it twice. */
 export type MarbleMap = Texture
+
+/** 2048 on desktop, 1024 on Quest, tiny under Vitest so the suite stays fast. */
+export function marbleBakeSize(): number {
+  if (typeof process !== 'undefined' && process.env.VITEST) return 64
+  if (typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)) return 1024
+  return 2048
+}
+
+export interface MarbleBakeOptions {
+  size: number
+  dark: boolean
+  /** How strongly veins replace the body. Floor is 0.35, walls 0.25, board dark 0.85. */
+  veinMix: number
+  /** 8 makes a unique tile per square. 1 is a repeating slab. */
+  cells: number
+  base?: readonly [number, number, number]
+}
+
+/** One-time marble albedo. The fragment shader no longer evaluates noise every frame. */
+export function bakeMarble(options: MarbleBakeOptions): DataTexture {
+  const { size, dark, veinMix, cells } = options
+  const base = options.base ?? (dark ? [11, 11, 12] : [240, 235, 227])
+  const vein = dark ? [74, 69, 62] : [110, 106, 100]
+  const data = new Uint8Array(size * size * 4)
+  const cell = size / cells
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const file = Math.min(cells - 1, Math.floor(x / cell))
+      const rank = Math.min(cells - 1, Math.floor(y / cell))
+      const u = (x - file * cell) / cell
+      const v = (y - rank * cell) / cell
+      const seed = fract(Math.sin(file * 19.17 + rank * 73.13) * 43758.5453)
+      const amount = veinAmount(u, v, seed)
+      const mix = dark ? Math.min(1, amount * veinMix) : Math.min(1, amount)
+      const body = dark ? 0.35 : 0.06
+      const cloud = fbm(u * 3.2 + seed, v * 3.2 + seed)
+      const i = (y * size + x) * 4
+      data[i] = clamp(base[0] * (1 - body * cloud) * (1 - mix) + vein[0] * mix)
+      data[i + 1] = clamp(base[1] * (1 - body * cloud) * (1 - mix) + vein[1] * mix)
+      data[i + 2] = clamp(base[2] * (1 - body * cloud) * (1 - mix) + vein[2] * mix)
+      data[i + 3] = 255
+    }
+  }
+  const texture = publish(data, size)
+  texture.wrapS = RepeatWrapping
+  texture.wrapT = RepeatWrapping
+  texture.flipY = false
+  return texture
+}
+
+function veinAmount(u: number, v: number, seed: number): number {
+  const angle = seed * Math.PI * 2 * 0.7
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const px = u - 0.5
+  const py = v - 0.5
+  const rx = cos * px - sin * py + 0.5 + fract(Math.sin(seed) * 43758.5453) * 0.35
+  const ry = sin * px + cos * py + 0.5 + fract(Math.sin(seed + 7.1) * 43758.5453) * 0.35
+  const q = fbm(rx * 2.4 + seed, ry * 2.4 + seed)
+  const q2 = fbm(rx * 2.4 + 19.2, ry * 2.4 + 19.2)
+  const wx = rx + 0.22 * q
+  const wy = ry + 0.22 * q2
+  const ridged = 1 - Math.abs(noiseSigned(wx * 3.6 + seed, wy * 3.6 + seed))
+  let vein = smoothstep(0.72, 0.98, ridged) ** 1.8
+  const hair = 1 - Math.abs(noiseSigned(wx * 7.2, wy * 7.2))
+  vein += 0.18 * smoothstep(0.8, 0.98, hair) ** 2.2
+  return vein
+}
+
+function noiseSigned(x: number, y: number): number {
+  return noise(x, y) * 2 - 1
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
+function fract(value: number): number {
+  return value - Math.floor(value)
+}

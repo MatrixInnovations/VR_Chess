@@ -106,9 +106,17 @@ export class ChessHall {
 
   /** Hero framing for the desktop shot. XR keeps the seated eye. */
   frameDesktop(): void {
-    this.camera.fov = 34
-    this.camera.position.set(0, 0.98, 0.52)
-    this.camera.lookAt(0, 0.78, -0.04)
+    this.camera.fov = 36
+    this.camera.position.set(0.08, 1.05, 0.66)
+    this.camera.lookAt(0, 0.8, 0.04)
+    this.camera.updateProjectionMatrix()
+  }
+
+  /** Wider documentation shot. The page uses {@link frameDesktop}. */
+  frameDocumentation(): void {
+    this.camera.fov = 40
+    this.camera.position.set(0.12, 1.32, 1.1)
+    this.camera.lookAt(0, 0.8, 0)
     this.camera.updateProjectionMatrix()
   }
 
@@ -250,7 +258,7 @@ export class ChessHall {
       { name: 'wall-west', size: { x: 0.08, y: 3, z: 6 }, position: { x: -3, y: 1.5, z: 0 } },
     ]
     for (const wall of walls) {
-      this.addBox(wall.name, wall.size, wall.position, this.materials.plaster(), room, false)
+      this.addBox(wall.name, wall.size, wall.position, this.materials.wall(), room, false)
     }
 
     const tableTop = TABLE_TOP_Y
@@ -261,7 +269,7 @@ export class ChessHall {
       this.materials.tableTop(),
       room,
       true,
-      true,
+      false,
     )
     const underside = tableTop - 0.04
     const legHeight = underside - 0.04

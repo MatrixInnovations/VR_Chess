@@ -55,7 +55,7 @@ export class WebXrHallSession implements XrSessionPort {
         hitTest: true,
         domOverlay: false,
         foveation: 1,
-        frameBufferScaling: 1,
+        frameBufferScaling: 0.95,
         frameRate: (supported: ArrayLike<number>) => {
           const rates = Array.from(supported)
           if (rates.includes(72)) return 72

@@ -67,10 +67,8 @@ export function configureHallStage(
   gl.toneMapping = ACESFilmicToneMapping
   gl.toneMappingExposure = quest ? 1 : 1.05
   gl.physicallyCorrectLights = true
-  capPixelRatio(gl, quest ? 1 : 1.5)
   hall.setTier(quest ? 'quest' : 'desktop')
-  const xr = gl.xr as { setFramebufferScaleFactor?: (value: number) => void; addEventListener?: (type: string, listener: () => void) => void } | undefined
-  if (quest) xr?.setFramebufferScaleFactor?.(0.95)
+  const xr = gl.xr as { addEventListener?: (type: string, listener: () => void) => void } | undefined
   if (!quest) {
     hall.frameDesktop()
     RectAreaLightUniformsLib.init()
@@ -78,7 +76,7 @@ export function configureHallStage(
     const controls = new OrbitControls(camera, gl.domElement)
     controls.target.set(0, BOARD_SURFACE_Y, 0)
     controls.minDistance = 0.55
-    controls.maxDistance = 1.85
+    controls.maxDistance = 1.25
     controls.minPolarAngle = 0.45
     controls.maxPolarAngle = 1.25
     controls.enablePan = false
@@ -93,7 +91,7 @@ export function configureHallStage(
       hall.reflector = reflector
       const composer = new EffectComposer(gl)
       composer.addPass(new RenderPass(scene, camera))
-      composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.92))
+      composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.95))
       const css = new Vector2()
       if (typeof gl.getSize === 'function') gl.getSize(css)
       if (css.x > 0 && css.y > 0) composer.setSize(css.x, css.y)
@@ -134,11 +132,6 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
       scene.environment = buildEnvironment(gl, darkHallEnvScene(), bake)
     },
   )
-}
-
-function capPixelRatio(gl: WebGLRenderer, cap: number): void {
-  if (typeof gl.getPixelRatio !== 'function' || typeof gl.setPixelRatio !== 'function') return
-  gl.setPixelRatio(Math.min(gl.getPixelRatio() || 1, cap))
 }
 
 function loadStudioHdr(

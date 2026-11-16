@@ -1,17 +1,13 @@
 import {
-  DataTexture,
   LinearEncoding,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
-  RGBAFormat,
   Texture,
-  Vector2,
 } from 'three'
 
-import { coordinateBorderTexture, scratchMaps } from './MarbleTexture'
-import { applyMarbleVeins } from './MarbleVeins'
+import { bakeMarble, coordinateBorderTexture, marbleBakeSize, scratchMaps } from './MarbleTexture'
 
 import type { PieceColor, PieceFinish } from '../contracts/types'
 
@@ -74,7 +70,25 @@ export class PieceMaterialSet {
    * Creates the instance.
    */
   constructor() {
-    const uv = this.keep(whiteUvTexture())
+    const size = marbleBakeSize()
+    const lightAtlas = this.keep(bakeMarble({ size, dark: false, veinMix: 1, cells: 8 }))
+    const darkAtlas = this.keep(bakeMarble({ size, dark: true, veinMix: 0.85, cells: 8 }))
+    const floorTile = this.keep(bakeMarble({
+      size: Math.max(64, size / 2),
+      dark: true,
+      veinMix: 0.35,
+      cells: 1,
+      base: [10, 10, 11],
+    }))
+    floorTile.repeat.set(4, 4)
+    const wallTile = this.keep(bakeMarble({
+      size: Math.max(64, size / 2),
+      dark: true,
+      veinMix: 0.25,
+      cells: 1,
+      base: [12, 11, 10],
+    }))
+    wallTile.repeat.set(1.5, 1.5)
     const scratch = scratchMaps()
     scratch.roughness.encoding = LinearEncoding
     scratch.normal.encoding = LinearEncoding
@@ -83,16 +97,16 @@ export class PieceMaterialSet {
     this.scratch = scratch
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.08, 0.06, 2.15))
-    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.1, 0.08, 1.6))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 2.15))
-    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.6))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.08, 0.06, 2.15))
-    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.1, 0.08, 1.6))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.08, 0.06, 1.8))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.1, 0.08, 1.35))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 1.8))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.35))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.08, 0.06, 1.8))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.1, 0.08, 1.35))
 
-    this.put('board:light', this.marble(0xf0ebe3, uv, 0.16, 0.95, 0.08, 1.15, new Vector2(0.04, 0.04), false))
-    this.put('board:dark', this.marble(0x0b0b0c, uv, 0.12, 1, 0.06, 1.45, new Vector2(0.035, 0.035), true))
-    this.put('board:frame', this.marble(0x0b0b0c, uv, 0.13, 1, 0.06, 1.35, new Vector2(0.035, 0.035), true))
+    this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 1.15))
+    this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 1.45))
+    this.put('board:frame', this.marble(floorTile, 0.13, 0.2, 0.18, 0.4))
     this.put(
       'board:highlight',
       this.make({
@@ -128,25 +142,17 @@ export class PieceMaterialSet {
         metalness: 0,
         clearcoat: 0,
         envMapIntensity: 0.3,
-        sheen: 0.45,
-        sheenColor: 0x2a3a2e,
-        sheenRoughness: 0.75,
+        sheen: 0,
       }),
     )
 
-    this.put('room:floor', this.marble(0x0a0a0b, uv, 0.55, 0.05, 0.4, 0.12, new Vector2(0.025, 0.025), true))
-    this.put('room:table', this.make({
-      color: 0x050506,
-      roughness: 0.22,
-      metalness: 0.04,
-      clearcoat: 0.28,
-      clearcoatRoughness: 0.22,
-      envMapIntensity: 0.12,
-    }))
-    this.put('room:plaster', this.marble(0x0b0b0c, uv, 0.42, 0.22, 0.24, 0.32, new Vector2(0.03, 0.03), true))
+    this.put('room:floor', this.marble(floorTile, 0.5, 0.15, 0.22, 0.35))
+    this.put('room:table', this.marble(floorTile, 0.45, 0.2, 0.22, 0.4))
+    this.put('room:wall', this.marble(wallTile, 0.62, 0.08, 0.3, 0.3))
+    this.put('room:plaster', this.marble(wallTile, 0.62, 0.08, 0.3, 0.3))
     this.put('room:ceiling', this.make({ color: 0x0c0b0a, roughness: 0.7, metalness: 0, clearcoat: 0.05, clearcoatRoughness: 0.6, envMapIntensity: 0.4 }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
-    this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35, sheen: 0.4, sheenColor: 0x2a2420 }))
+    this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35 }))
     this.put('room:leg', this.make({ color: 0x141210, roughness: 0.35, metalness: 0.05, clearcoat: 0.2, clearcoatRoughness: 0.35, envMapIntensity: 0.8 }))
     this.put(
       'room:window',
@@ -205,6 +211,11 @@ export class PieceMaterialSet {
   /** Black marble floor. */
   floorWood(): MeshStandardMaterial {
     return this.table.get('room:floor') as MeshStandardMaterial
+  }
+
+  /** Black marble walls. Large veins, almost no clearcoat. */
+  wall(): MeshStandardMaterial {
+    return this.table.get('room:wall') as MeshStandardMaterial
   }
 
   /** Dark stone walls. */
@@ -348,17 +359,14 @@ export class PieceMaterialSet {
   }
 
   private marble(
-    color: number,
     map: Texture,
     roughness: number,
     clearcoat: number,
     clearcoatRoughness: number,
     envMapIntensity: number,
-    normalScale: Vector2,
-    dark: boolean,
   ): MeshPhysicalMaterial {
-    const material = this.make({
-      color,
+    return this.make({
+      color: 0xffffff,
       map,
       roughness,
       metalness: 0,
@@ -366,11 +374,7 @@ export class PieceMaterialSet {
       clearcoatRoughness,
       envMapIntensity,
       ior: 1.5,
-      reflectivity: 0.5,
     })
-    material.normalScale.copy(normalScale)
-    applyMarbleVeins(material, dark)
-    return material
   }
 
   private put(key: string, material: MeshStandardMaterial): void {
@@ -424,11 +428,4 @@ export class PieceMaterialSet {
     if (args.sheenRoughness !== undefined) material.sheenRoughness = args.sheenRoughness
     return material
   }
-}
-
-function whiteUvTexture(): DataTexture {
-  const data = new Uint8Array([255, 255, 255, 255])
-  const texture = new DataTexture(data, 1, 1, RGBAFormat)
-  texture.needsUpdate = true
-  return texture
 }

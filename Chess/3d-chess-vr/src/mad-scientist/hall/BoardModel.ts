@@ -3,7 +3,6 @@ import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUt
 
 import { isOnBoard, squareKey } from '../contracts/squares'
 import type { Square } from '../contracts/types'
-import { stampTileSeed } from './MarbleVeins'
 import { BOARD_SURFACE_Y, FRAME_WIDTH_M, INLAY_WIDTH_M, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
 import { PieceMaterialSet } from './PieceMaterialSet'
 
@@ -135,7 +134,6 @@ export class BoardModel {
     const thickness = 0.018
     const top = BOARD_SURFACE_Y - 0.001
     const geometry = new BoxGeometry(span, thickness, span)
-    stampTileSeed(geometry, 0, 0)
     const frame = new Mesh(geometry, this.materials.boardFrame())
     frame.name = 'board-frame'
     frame.position.y = top - thickness / 2
@@ -203,7 +201,7 @@ export class BoardModel {
         this.squares.set(key, proxy)
         this.baseMaterials.set(key, material)
         const tile = new BoxGeometry(tileSize, SQUARE_THICKNESS_M, tileSize)
-        stampTileSeed(tile, file, rank)
+        mapSquareUv(tile, file, rank)
         tile.translate(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
         ;(light ? lightParts : darkParts).push(tile)
       }
@@ -238,6 +236,14 @@ export class BoardModel {
     plane.raycast = () => undefined
     this.object.add(plane)
     this.geometries.push(geometry)
+  }
+}
+
+/** Puts one square into its cell of the 8×8 baked marble atlas. */
+function mapSquareUv(geometry: BoxGeometry, file: number, rank: number): void {
+  const uv = geometry.getAttribute('uv')
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setXY(index, (file + uv.getX(index)) / 8, (rank + uv.getY(index)) / 8)
   }
 }
 

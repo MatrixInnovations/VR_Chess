@@ -1,5 +1,5 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
-import { PCFSoftShadowMap, type WebGLRenderer } from 'three'
+import { PCFShadowMap, type WebGLRenderer } from 'three'
 import { configureHallStage } from '../mad-scientist/hall/HallStage'
 import { XR, XROrigin, useXR } from '@react-three/xr'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type RefObject } from 'react'
@@ -162,6 +162,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
       </p>
       <div className="hall-stage">
         <Canvas
+          dpr={typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent) ? 1 : [1, 1.5]}
           shadows="percentage"
           gl={{ preserveDrawingBuffer: true, antialias: true }}
           camera={model.runtime.hall.camera}
@@ -170,10 +171,10 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
             if (gl.shadowMap) {
               gl.shadowMap.autoUpdate = false
               gl.shadowMap.needsUpdate = true
-              gl.shadowMap.type = PCFSoftShadowMap
+              gl.shadowMap.type = PCFShadowMap
             }
             const quest = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
-            const forceEffects = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('effects')
+            const forceEffects = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('effects') === '1'
             const skipEffects = typeof navigator !== 'undefined' && navigator.webdriver && !forceEffects
             if (state.scene && typeof gl.render === 'function') {
               configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest, {

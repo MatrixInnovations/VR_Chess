@@ -141,7 +141,7 @@ describe('ChessHall', () => {
         if (standard.map) maps.add(standard.map)
       }
     })
-    expect(maps.size).toBeLessThanOrEqual(4)
+    expect(maps.size).toBeLessThanOrEqual(8)
     expect(meshes).toBeLessThan(180)
     expect(materials.size).toBeLessThanOrEqual(24)
     hall.dispose()
