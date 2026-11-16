@@ -49,9 +49,63 @@ body {
 .hall-actions,
 .hall-panel,
 .hall-meta {
-  position: relative;
+  position: absolute;
   z-index: 2;
-  margin: 0.4rem 1rem;
+  margin: 0;
+}
+
+.hall-title {
+  top: 0.7rem;
+  left: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: rgba(14, 14, 16, 0.55);
+  color: #f6f1e6;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.hall-meta {
+  top: 2.35rem;
+  left: 0.9rem;
+  background: rgba(14, 14, 16, 0.55);
+  border: none;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 1.05rem;
+  color: #f6f1e6;
+}
+
+.hall-hud {
+  top: 4.2rem;
+  left: 0.9rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: 11rem;
+  font-size: 0.82rem;
+}
+
+.hall-lead {
+  top: 6.2rem;
+  left: 0.9rem;
+  max-width: 22rem;
+  font-size: 0.85rem;
+}
+
+.hall-actions {
+  left: 0.9rem;
+  bottom: 4.4rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.hall-tour,
+.hall-panel {
+  top: 6rem;
+  left: 0.9rem;
+  max-width: 24rem;
 }
 
 .hall-hud,
@@ -70,9 +124,7 @@ body {
   flex-wrap: wrap;
 }
 
-.hall-page h1,
-.hall-lead,
-.hall-meta {
+.hall-lead {
   background: var(--hud-bg-alpha);
   border-radius: 6px;
   padding: 0.35rem 0.6rem;
@@ -125,11 +177,12 @@ body {
 .hall-panel button,
 .hall-tour button {
   font: inherit;
+  font-size: 0.78rem;
   background: var(--hud-button-bg);
   color: var(--hud-button-text);
   border: 1px solid var(--hud-gold-soft);
   border-radius: 6px;
-  padding: 0.35rem 0.7rem;
+  padding: 0.25rem 0.5rem;
   cursor: pointer;
 }
 

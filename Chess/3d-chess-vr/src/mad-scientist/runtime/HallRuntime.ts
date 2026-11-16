@@ -79,9 +79,13 @@ export class HallRuntime {
    */
   frame(timestampMs: number): FrameReport {
     this.animator.update(timestampMs)
-    if (this.animator.isAnimating() || this.grab.isGrabbing()) this.hall.syncDecals()
+    const moving = this.animator.isAnimating() || this.grab.isGrabbing()
+    if (moving || this.wasMoving) this.hall.syncDecals()
+    this.wasMoving = moving
     return this.budget.sample(timestampMs)
   }
+
+  private wasMoving = false
 
   /** Detach every device and release the hall. */
   dispose(): void {

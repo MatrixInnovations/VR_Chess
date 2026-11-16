@@ -9,7 +9,7 @@ import type { PieceKind } from '../contracts/types'
 import { createBoardReflector } from '../hall/BoardReflector'
 import { buildEnvironment, darkHallEnvScene } from '../hall/HallEnvironment'
 import { KING_HEIGHT_M } from '../hall/metrics'
-import { coordinateBorderTexture, paintCoordinateGlyphs } from '../hall/MarbleTexture'
+import { coordinateBorderTexture, coordinateImage, paintCoordinateGlyphs } from '../hall/MarbleTexture'
 import { bakeMarbleGpu } from '../hall/MarbleVeins'
 import { carveMitreSlit, disposePieceGeometries, pieceGeometry } from '../hall/PieceGeometryCache'
 import { PieceMaterialSet } from '../hall/PieceMaterialSet'
@@ -116,6 +116,23 @@ describe('coordinate glyphs', () => {
     expect(drawn.filter((glyph) => glyph === 'a').length).toBeGreaterThan(0)
     expect(drawn).toContain('1')
     expect(drawn).toContain('h')
+  })
+
+  it('draws the near-edge d upright, with the stem on the left', () => {
+    const size = 256
+    const data = coordinateImage(size)
+    const band = Math.round((0.032 / 0.464) * size)
+    const along = band + ((3 + 0.5) / 8) * (size - band * 2)
+    const scale = 3
+    const width = 5 * scale
+    const height = 7 * scale
+    const left = Math.round(along - width / 2)
+    const top = Math.round(size - band / 2 - height / 2)
+    const alpha = (x: number, y: number) => data[(y * size + x) * 4 + 3]
+    expect(alpha(left + 1, top + 1)).toBeGreaterThan(200)
+    expect(alpha(left + width - 2, top + 1)).toBe(0)
+    const aAlong = band + (0.5 / 8) * (size - band * 2)
+    expect(along).toBeGreaterThan(aAlong)
   })
 
   it('builds a canvas texture when a 2d context exists', () => {

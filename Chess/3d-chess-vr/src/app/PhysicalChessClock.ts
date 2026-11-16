@@ -1,6 +1,7 @@
 import {
   CanvasTexture,
   Group,
+  LinearFilter,
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
@@ -172,6 +173,9 @@ export class PhysicalChessClock {
     if (!paint.texture) {
       paint.texture = new CanvasTexture(paint.canvas)
       paint.texture.encoding = sRGBEncoding
+      paint.texture.magFilter = LinearFilter
+      paint.texture.minFilter = LinearFilter
+      paint.texture.generateMipmaps = false
     }
     paint.texture.needsUpdate = true
     return true

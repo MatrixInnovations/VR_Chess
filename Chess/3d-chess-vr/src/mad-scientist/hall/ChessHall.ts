@@ -107,7 +107,7 @@ export class ChessHall {
   frameDesktop(): void {
     this.camera.fov = 40
     this.camera.position.set(0, 1.06, 0.47)
-    this.camera.lookAt(0, 0.76, -0.06)
+    this.camera.lookAt(0, 0.76, -0.09)
     this.camera.updateProjectionMatrix()
   }
 

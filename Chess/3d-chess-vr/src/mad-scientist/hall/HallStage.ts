@@ -66,7 +66,7 @@ export function configureHallStage(
 ): void {
   gl.outputEncoding = sRGBEncoding
   gl.toneMapping = ACESFilmicToneMapping
-  gl.toneMappingExposure = quest ? 1 : 1.05
+  gl.toneMappingExposure = quest ? 0.9 : 0.88
   gl.physicallyCorrectLights = true
   hall.setTier(quest ? 'quest' : 'desktop')
   const xr = gl.xr as { addEventListener?: (type: string, listener: () => void) => void } | undefined
@@ -75,7 +75,7 @@ export function configureHallStage(
     RectAreaLightUniformsLib.init()
     scene.fog = new FogExp2(0x0b0908, 0.045)
     const controls = new OrbitControls(camera, gl.domElement)
-    controls.target.set(0, BOARD_SURFACE_Y, 0)
+    controls.target.set(0, BOARD_SURFACE_Y, -0.09)
     controls.minDistance = 0.55
     controls.maxDistance = 1.25
     controls.minPolarAngle = 0.45

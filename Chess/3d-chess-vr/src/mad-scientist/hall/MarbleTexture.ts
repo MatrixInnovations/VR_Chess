@@ -49,20 +49,21 @@ export function paintCoordinateGlyphs(ctx: CanvasRenderingContext2D, size: numbe
   const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
   for (let index = 0; index < 8; index += 1) {
     const along = band + ((index + 0.5) / 8) * (size - band * 2)
+    const near = size - along
+    ctx.fillText(files[index], along, size - band / 2)
     ctx.save()
     ctx.translate(along, band / 2)
     ctx.rotate(Math.PI)
     ctx.fillText(files[index], 0, 0)
     ctx.restore()
-    ctx.fillText(files[index], along, size - band / 2)
     ctx.save()
-    ctx.translate(band / 2, along)
-    ctx.rotate(-Math.PI / 2)
+    ctx.translate(band / 2, near)
+    ctx.rotate(Math.PI / 2)
     ctx.fillText(ranks[index], 0, 0)
     ctx.restore()
     ctx.save()
-    ctx.translate(size - band / 2, along)
-    ctx.rotate(Math.PI / 2)
+    ctx.translate(size - band / 2, near)
+    ctx.rotate(-Math.PI / 2)
     ctx.fillText(ranks[index], 0, 0)
     ctx.restore()
   }
@@ -78,26 +79,32 @@ function coordinateCanvasTexture(size: number): CanvasTexture {
   const texture = new CanvasTexture(canvas)
   texture.encoding = sRGBEncoding
   texture.anisotropy = 8
-  texture.flipY = false
+  texture.flipY = true
   texture.needsUpdate = true
   return texture
 }
 
-function coordinateDataTexture(size: number): DataTexture {
+/** Pixel image of the frame labels. Near-edge files sit on the bottom, upright. */
+export function coordinateImage(size: number): Uint8Array {
   const data = new Uint8Array(size * size * 4)
   const band = Math.round((0.032 / 0.464) * size)
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
   const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
   for (let index = 0; index < 8; index += 1) {
     const along = band + ((index + 0.5) / 8) * (size - band * 2)
+    const near = size - along
+    stamp(data, size, files[index], along, size - band / 2, false)
     stamp(data, size, files[index], along, band / 2, true)
-    stamp(data, size, files[index], along, size - band / 2)
-    stamp(data, size, ranks[index], band / 2, along)
-    stamp(data, size, ranks[index], size - band / 2, along)
+    stamp(data, size, ranks[index], band / 2, near, false)
+    stamp(data, size, ranks[index], size - band / 2, near, false)
   }
-  const texture = publish(data, size)
+  return data
+}
+
+function coordinateDataTexture(size: number): DataTexture {
+  const texture = publish(coordinateImage(size), size)
   texture.anisotropy = 8
-  texture.flipY = false
+  texture.flipY = true
   return texture
 }
 
@@ -120,14 +127,19 @@ export function contactFalloffTexture(): DataTexture {
   return publish(data, size)
 }
 
+function powerOfTwo(value: number): boolean {
+  return value > 0 && (value & (value - 1)) === 0
+}
+
 function publish(data: Uint8Array, size: number): DataTexture {
   const texture = new DataTexture(data, size, size, RGBAFormat)
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
   texture.magFilter = LinearFilter
-  texture.minFilter = LinearMipmapLinearFilter
-  texture.generateMipmaps = true
-  texture.anisotropy = 8
+  const mipmaps = powerOfTwo(size)
+  texture.generateMipmaps = mipmaps
+  texture.minFilter = mipmaps ? LinearMipmapLinearFilter : LinearFilter
+  texture.anisotropy = mipmaps ? 8 : 1
   texture.encoding = sRGBEncoding
   texture.flipY = false
   texture.premultiplyAlpha = false

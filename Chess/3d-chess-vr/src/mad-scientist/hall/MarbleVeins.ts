@@ -131,11 +131,12 @@ export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, qu
 }
 
 function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: boolean, veinMix: number): WebGLRenderTarget {
+  const mipmaps = size > 0 && (size & (size - 1)) === 0
   const target = new WebGLRenderTarget(size, size, {
     magFilter: LinearFilter,
-    minFilter: LinearMipmapLinearFilter,
-    generateMipmaps: true,
-    anisotropy: 8,
+    minFilter: mipmaps ? LinearMipmapLinearFilter : LinearFilter,
+    generateMipmaps: mipmaps,
+    anisotropy: mipmaps ? 8 : 1,
     wrapS: RepeatWrapping,
     wrapT: RepeatWrapping,
     encoding: sRGBEncoding,

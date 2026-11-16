@@ -100,12 +100,15 @@ export class PieceMaterialSet {
     this.scratch = scratch
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.12, 0.04, 2.6))
-    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.18, 0.05, 3.4))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.12, 0.04, 2.6))
-    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.18, 0.05, 3.4))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.12, 0.04, 2.6))
-    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.18, 0.05, 3.4))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.08, 0.04, 1.6))
+    this.put('black:idle', this.metal(0xc06a38, 0.08, 0, 0, 1, 0.1, 0.05, 2))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.04, 1.6))
+    this.put('black:selected', this.metal(0xc06a38, 0.08, 0xc9a44c, 0.12, 1, 0.1, 0.05, 2))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.08, 0.04, 1.6))
+    this.put('black:dragging', this.metal(0xc06a38, 0.08, 0, 0, 0.7, 0.1, 0.05, 2))
+    for (const finish of ['idle', 'selected', 'dragging'] as const) {
+      this.get('black', finish).metalness = 0.8
+    }
 
     this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4))
     this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 0.15))
@@ -127,14 +130,14 @@ export class PieceMaterialSet {
     this.put(
       'board:coords',
       this.make({
-        color: 0xe8d4b0,
+        color: 0xffffff,
         map: glyphs,
-        roughness: 0.28,
-        metalness: 0.55,
-        clearcoat: 0.2,
-        clearcoatRoughness: 0.25,
-        envMapIntensity: 1.2,
+        roughness: 0.4,
+        metalness: 0,
+        clearcoat: 0,
+        envMapIntensity: 0.2,
         transparent: true,
+        alphaTest: 0.5,
       }),
     )
     this.put(
@@ -441,6 +444,7 @@ export class PieceMaterialSet {
     sheenRoughness?: number
     transparent?: boolean
     polygonOffset?: boolean
+    alphaTest?: number
   }): MeshPhysicalMaterial {
     const opacity = args.opacity ?? 1
     const material = new MeshPhysicalMaterial({
@@ -462,6 +466,7 @@ export class PieceMaterialSet {
       polygonOffsetFactor: args.polygonOffset ? -2 : 0,
       polygonOffsetUnits: args.polygonOffset ? -2 : 0,
     })
+    if (args.alphaTest !== undefined) material.alphaTest = args.alphaTest
     if (args.ior !== undefined) material.ior = args.ior
     if (args.sheen !== undefined) material.sheen = args.sheen
     if (args.sheenColor !== undefined) material.sheenColor.setHex(args.sheenColor)

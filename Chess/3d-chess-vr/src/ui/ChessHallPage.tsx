@@ -33,6 +33,7 @@ export interface ChessHallPageProps {
 export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const [model] = useState(() => app ?? ChessApplication.boot())
   const [mounted, setMounted] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
   const revision = useSyncExternalStore(
     (listener) => model.watch(listener),
     () => model.revision,
@@ -41,6 +42,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   useEffect(() => {
     setMounted(true)
     if (typeof window === 'undefined') return undefined
+    if (window.sessionStorage.getItem('hall-intro-seen') !== '1') setShowIntro(true)
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
     if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
     void model.completeRedirectIfPresent(window.location.href)
@@ -70,10 +72,21 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   void revision
   return (
     <main className="hall-page">
-      <h1>Chess Hall</h1>
-      <p className="hall-lead">
-        Seated at a marble board. Pass and play is ready. Lichess is in the menu.
-      </p>
+      <h1 className="hall-title">Chess Hall</h1>
+      {showIntro ? (
+        <p className="hall-lead">
+          Seated at a marble board. Pass and play is ready. Lichess is in the menu.{' '}
+          <button
+            type="button"
+            onClick={() => {
+              window.sessionStorage.setItem('hall-intro-seen', '1')
+              setShowIntro(false)
+            }}
+          >
+            Dismiss
+          </button>
+        </p>
+      ) : null}
       <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
         <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
           White {formatClockMs(clock.white.remainingMs, clockBlank || !mounted)}
