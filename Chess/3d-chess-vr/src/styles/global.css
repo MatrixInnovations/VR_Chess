@@ -89,12 +89,16 @@ body {
 }
 
 .hall-clock-provisional {
-  color: var(--hud-gold-soft);
+  color: #1a120c;
+  background: #e8d4b0;
+  border-radius: 4px;
+  padding: 0 0.35rem;
+  box-shadow: none;
 }
 
 .hall-clock-flag {
   color: var(--hud-text);
-  background: #8e2d2d;
+  background: #1a0505;
   border-radius: 4px;
   padding: 0 0.35rem;
 }

@@ -14,7 +14,7 @@ import { ClockMaterials } from '../mad-scientist/hall/ClockMaterials'
 const FACE_INK: Record<ClockFaceExpiry, { background: string; digit: string }> = {
   running: { background: '#141210', digit: '#f3efe6' },
   'provisional-expired': { background: '#c9a44c', digit: '#0e0e10' },
-  'confirmed-flag': { background: '#8e2d2d', digit: '#f3efe6' },
+  'confirmed-flag': { background: '#1a0505', digit: '#f3efe6' },
   'offline-local-flag': { background: '#c06a38', digit: '#0e0e10' },
   'no-clock': { background: '#0e0e10', digit: '#d4af37' },
 }
@@ -102,11 +102,12 @@ export class PhysicalChessClock {
 
   private paint(mesh: Mesh, face: IClockSideFace, side: 'white' | 'black'): void {
     const paint = this.faces[side]
-    const signature = `${face.label}|${face.expiry}`
+    const low = face.expiry === 'running' && face.isActive && (face.remainingMs ?? 0) > 0 && (face.remainingMs ?? 0) <= 30_000
+    const signature = `${face.label}|${face.expiry}|${low ? 'low' : ''}`
     mesh.userData.clockLabel = face.label
     mesh.userData.clockSide = side
     if (paint.signature === signature) return
-    const drawn = this.redraw(paint, face.label, face.expiry)
+    const drawn = this.redraw(paint, face.label, face.expiry, low)
     paint.signature = signature
     if (!drawn) {
       mesh.material = this.materials.forExpiry(face.expiry)
@@ -124,7 +125,7 @@ export class PhysicalChessClock {
   }
 
   /** Draw into the one canvas this face already owns. */
-  private redraw(paint: FacePaint, label: string, expiry: ClockFaceExpiry): boolean {
+  private redraw(paint: FacePaint, label: string, expiry: ClockFaceExpiry, low: boolean): boolean {
     if (typeof document === 'undefined') return false
     if (!paint.canvas) {
       paint.canvas = document.createElement('canvas')
@@ -141,11 +142,15 @@ export class PhysicalChessClock {
     const ink = FACE_INK[expiry]
     context.fillStyle = ink.background
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
-    context.fillStyle = ink.digit
+    context.fillStyle = low ? '#e7b48a' : ink.digit
     context.font = 'bold 72px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2)
+    if (low) {
+      context.fillStyle = '#c06a38'
+      context.fillRect(18, paint.canvas.height - 14, paint.canvas.width - 36, 6)
+    }
     if (!paint.texture) {
       paint.texture = new CanvasTexture(paint.canvas)
       paint.texture.encoding = sRGBEncoding

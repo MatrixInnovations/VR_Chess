@@ -106,9 +106,9 @@ export class ChessHall {
 
   /** Hero framing for the desktop shot. XR keeps the seated eye. */
   frameDesktop(): void {
-    this.camera.fov = 42
-    this.camera.position.set(0, 1.22, 0.92)
-    this.camera.lookAt(0, BOARD_SURFACE_Y, 0)
+    this.camera.fov = 34
+    this.camera.position.set(0, 0.98, 0.52)
+    this.camera.lookAt(0, 0.78, -0.04)
     this.camera.updateProjectionMatrix()
   }
 

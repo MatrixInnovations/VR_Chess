@@ -10,6 +10,8 @@ import { readXrPoses, type LooseXrInput, type XrFrameLike } from '../app/XrInput
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
 import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
+import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
+import { publishFrameSample } from './frameSample'
 import { SiteCredit } from './SiteCredit'
 
 /**
@@ -50,6 +52,14 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const signIn = model.shell.authPresenter.snapshot()
   const lobby = model.shell.lobbyPresenter.snapshot()
   const waiting = model.shell.waitingPresenter.snapshot()
+  const fridae = model.readModel.fridae()
+  const clockBlank =
+    screen === 'waiting' ||
+    !fridae ||
+    fridae.kind === 'absent' ||
+    fridae.kind === 'unlimited' ||
+    fridae.kind === 'correspondence' ||
+    fridae.whiteDisplayMs == null
   const over = model.shell.gameOverPresenter.snapshot()
   const error = model.shell.errorPresenter.snapshot()
   const snap = model.game.snapshot
@@ -61,13 +71,13 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         Seated at a marble board. Pass and play is ready. Lichess is in the menu.
       </p>
       <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
-        <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clock.white.expiry} className={clockFaceClass(clock.white)}>
-          White {formatMs(clock.white.remainingMs)}
-          {clockNote(clock.white)}
+        <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
+          White {formatClockMs(clock.white.remainingMs, clockBlank)}
+          {clockNote({ ...clock.white, blank: clockBlank })}
         </p>
-        <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clock.black.expiry} className={clockFaceClass(clock.black)}>
-          Black {formatMs(clock.black.remainingMs)}
-          {clockNote(clock.black)}
+        <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clockBlank ? 'no-clock' : clock.black.expiry} className={clockFaceClass({ ...clock.black, blank: clockBlank })}>
+          Black {formatClockMs(clock.black.remainingMs, clockBlank)}
+          {clockNote({ ...clock.black, blank: clockBlank })}
         </p>
         <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
         <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
@@ -225,6 +235,7 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     const grade = model.runtime.hall.grade
     if (grade) grade.render()
     else if (typeof state.gl.render === 'function') state.gl.render(state.scene, state.camera)
+    publishFrameSample(state.gl)
   }, 1)
   return null
 }
@@ -351,30 +362,3 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
   )
 }
 
-/**
- * Format a published millisecond value. This does not sample a clock.
- * @param ms - Remaining time from the read model.
- * @returns `m:ss`.
- */
-function clockFaceClass(face: { isActive: boolean; expiry: string; remainingMs: number }): string {
-  const names = ['hall-clock']
-  if (face.isActive) names.push('hall-clock-active')
-  if (face.expiry === 'provisional-expired') names.push('hall-clock-provisional')
-  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') names.push('hall-clock-flag')
-  if (face.expiry === 'running' && face.isActive && face.remainingMs <= 30_000) names.push('hall-clock-low')
-  return names.join(' ')
-}
-
-function clockNote(face: { isActive: boolean; expiry: string; remainingMs: number }): string {
-  if (face.expiry === 'provisional-expired') return ' · provisional'
-  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') return ' · flag'
-  if (face.expiry === 'running' && face.isActive && face.remainingMs <= 30_000) return ' · low'
-  return ''
-}
-
-function formatMs(ms: number): string {
-  const whole = Math.max(0, Math.floor(ms / 1000))
-  const minutes = Math.floor(whole / 60)
-  const seconds = whole % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}

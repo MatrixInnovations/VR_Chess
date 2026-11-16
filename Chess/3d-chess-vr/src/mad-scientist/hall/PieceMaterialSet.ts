@@ -134,16 +134,16 @@ export class PieceMaterialSet {
       }),
     )
 
-    this.put('room:floor', this.marble(0x0a0a0b, uv, 0.32, 0.4, 0.18, 0.65, new Vector2(0.035, 0.035), true))
+    this.put('room:floor', this.marble(0x0a0a0b, uv, 0.55, 0.05, 0.4, 0.12, new Vector2(0.025, 0.025), true))
     this.put('room:table', this.make({
-      color: 0x0b0b0c,
-      roughness: 0.32,
-      metalness: 0,
-      clearcoat: 0.45,
-      clearcoatRoughness: 0.16,
-      envMapIntensity: 0.7,
+      color: 0x050506,
+      roughness: 0.22,
+      metalness: 0.04,
+      clearcoat: 0.28,
+      clearcoatRoughness: 0.22,
+      envMapIntensity: 0.12,
     }))
-    this.put('room:plaster', this.make({ color: 0x12100e, roughness: 0.55, metalness: 0, clearcoat: 0.15, clearcoatRoughness: 0.4, envMapIntensity: 0.6 }))
+    this.put('room:plaster', this.marble(0x0b0b0c, uv, 0.42, 0.22, 0.24, 0.32, new Vector2(0.03, 0.03), true))
     this.put('room:ceiling', this.make({ color: 0x0c0b0a, roughness: 0.7, metalness: 0, clearcoat: 0.05, clearcoatRoughness: 0.6, envMapIntensity: 0.4 }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
     this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35, sheen: 0.4, sheenColor: 0x2a2420 }))
