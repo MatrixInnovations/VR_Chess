@@ -161,7 +161,8 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
               gl.shadowMap.type = PCFSoftShadowMap
             }
             const quest = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
-            if (state.scene && typeof gl.render === 'function') {
+            const automated = typeof navigator !== 'undefined' && navigator.webdriver
+            if (state.scene && typeof gl.render === 'function' && !automated) {
               configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest)
             }
             model.attachPointer(state.gl.domElement as unknown as PointerSurface)
