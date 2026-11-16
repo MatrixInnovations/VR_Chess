@@ -38,6 +38,14 @@ export interface IClockPort {
   arm(config: { whiteMs: number; blackMs: number; incrementMs: number }, turn: Color, atMs: number): ClockReading;
   /** Stop the countdown without disposing the clock. */
   stop(): void;
+  /**
+   * Tell the clock a terminal Lichess status.
+   * `outoftime` confirms the flag. Other terminal statuses freeze the clock.
+   * Optional so a countdown double can omit it.
+   * @param status - Game status name from the stream.
+   * @param winner - Winner, or null for a draw.
+   */
+  finish?(status: string, winner: Color | null): void;
   /** Release timers. */
   dispose(): void;
 }

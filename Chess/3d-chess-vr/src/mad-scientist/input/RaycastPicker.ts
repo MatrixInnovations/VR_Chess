@@ -72,6 +72,7 @@ export class RaycastPicker implements IPointerPicker {
       if (!role) continue
       const world: Vec3 = { x: hit.point.x, y: hit.point.y, z: hit.point.z }
       if (role.role === 'piece' && role.pieceId) {
+        if (isHeld(hit.object)) continue
         const model = this.hall.getPiece(role.pieceId)
         if (!model) continue
         const piece: PieceSnapshot = {
@@ -91,6 +92,15 @@ export class RaycastPicker implements IPointerPicker {
     }
     return { square: null, piece: null, clock: false, world: null }
   }
+}
+
+function isHeld(object: Object3D): boolean {
+  let current: Object3D | null = object
+  while (current) {
+    if (current.userData.msHeld === true) return true
+    current = current.parent
+  }
+  return false
 }
 
 function readRole(object: Object3D): HitRole | null {

@@ -60,7 +60,7 @@ export class BoardEventParser {
     if (type === 'challenge') return this.challenge(record, 'challenge');
     if (type === 'challengeCanceled') return this.challenge(record, 'challengeCanceled');
     if (type === 'challengeDeclined') return this.challenge(record, 'challengeDeclined');
-    return { kind: 'invalid' };
+    return { kind: 'ignore' };
   }
 
   private gameFull(record: Record<string, unknown>): ParsedLine {

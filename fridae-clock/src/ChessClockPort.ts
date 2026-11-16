@@ -1,4 +1,5 @@
 import { ChessClock, type ClockTapTarget, type Color } from "./ChessClock"
+import { LichessClockSynchronizer, type LichessBoardStreamEvent } from "./LichessClockSynchronizer"
 import { ManualMonotonicTimeSource } from "./MonotonicTimeSource"
 
 /**
@@ -52,6 +53,12 @@ export interface IClockPort {
   ): ClockReading
   /** Stop the countdown without disposing the clock. */
   stop(): void
+  /**
+   * Apply a terminal Lichess status. `outoftime` confirms the flag.
+   * @param status - Status name from the stream.
+   * @param winner - Winner, or null.
+   */
+  finish?(status: string, winner: Color | null): void
   /** Release the underlying clock. */
   dispose(): void
 }
@@ -63,10 +70,13 @@ export interface IClockPort {
  */
 export class ChessClockPort implements IClockPort {
   readonly chessClock: ChessClock
+  /** Board-stream adapter. Server snapshots go through this, not a second clock. */
+  readonly synchronizer: LichessClockSynchronizer
   private readonly time: ManualMonotonicTimeSource
   private lastAt: number | null = null
   private moveSerial = 0
   private ply = 0
+  private generation = 0
 
   /**
    * @param mode - Offline clocks may flag locally. Online zeros stay provisional.
@@ -80,6 +90,16 @@ export class ChessClockPort implements IClockPort {
       incrementMs: 0,
       sideToMove: "white",
     })
+    this.synchronizer = new LichessClockSynchronizer(this.chessClock)
+  }
+
+  /**
+   * Feed one Board API stream object into {@link LichessClockSynchronizer}.
+   * @param generation - Connection generation. A new socket uses a new number.
+   * @param event - `gameFull`, `gameState`, or another stream line.
+   */
+  receive(generation: number, event: LichessBoardStreamEvent): void {
+    this.synchronizer.receive(generation, event)
   }
 
   /** @inheritdoc */
@@ -121,6 +141,9 @@ export class ChessClockPort implements IClockPort {
     this.seek(atMs)
     this.ply = 0
     this.moveSerial = 0
+    if (config.whiteMs === 0 && config.blackMs === 0) {
+      return this.reading()
+    }
     this.chessClock.rearm({
       whiteMs: config.whiteMs,
       blackMs: config.blackMs,
@@ -128,6 +151,34 @@ export class ChessClockPort implements IClockPort {
       sideToMove: turn,
     })
     return this.reading()
+  }
+
+  /**
+   * Confirm or freeze from a terminal status.
+   * A second call after the clock is already terminal does nothing.
+   * @param status - Lichess status name.
+   * @param winner - Winner, or null.
+   */
+  finish(status: string, winner: Color | null): void {
+    const snap = this.chessClock.snapshot()
+    if (snap.terminal || snap.mode !== "online") return
+    this.generation += 1
+    const kind = snap.kind === "correspondence" || snap.kind === "unlimited" ? snap.kind : "realtime"
+    this.chessClock.applyAuthoritativeSnapshot({
+      generation: this.generation,
+      ply: snap.ply,
+      whiteMs: snap.whiteDisplayMs ?? 0,
+      blackMs: snap.blackDisplayMs ?? 0,
+      whiteIncrementMs: snap.whiteIncrementMs,
+      blackIncrementMs: snap.blackIncrementMs,
+      sideToMove: snap.activeColor ?? "white",
+      status,
+      winner,
+      kind,
+      speed: snap.speed,
+      daysPerTurn: snap.daysPerTurn,
+      expiration: null,
+    })
   }
 
   /** @inheritdoc */

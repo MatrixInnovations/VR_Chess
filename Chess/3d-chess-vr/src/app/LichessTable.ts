@@ -77,7 +77,7 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
    * The token is stored by the OAuth client and is not returned to the screen for display.
    * @param callbackUrl - Full redirect URL.
    */
-  async completeLogin(callbackUrl: string): Promise<{ accessToken: string; username: string }> {
+  async completeLogin(callbackUrl: string): Promise<{ username: string }> {
     const oauth = this.ensureOauth()
     const exchanged = await oauth.completeAuthorization(callbackUrl)
     if (!exchanged.ok) throw new Error(exchanged.message)
@@ -88,16 +88,23 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
     this.username = account.username
     this.state = 'online'
     this.error = null
-    return { accessToken, username: account.username }
+    return { username: account.username }
   }
 
-  /** Revoke the token when Lichess accepts it, then forget the username. */
+  /**
+   * Revoke the token when Lichess accepts it, and always drop the local copy.
+   * An expired or already-revoked token must not trap the player as signed in.
+   */
   async logout(): Promise<void> {
     if (!this.oauth) return
-    const revoked = await this.oauth.revoke()
-    if (!revoked.ok) throw new Error(revoked.message)
-    this.username = null
-    this.state = 'idle'
+    try {
+      const revoked = await this.oauth.revoke()
+      if (!revoked.ok) this.error = { code: 'revoke', message: revoked.message }
+    } finally {
+      this.oauth.forget()
+      this.username = null
+      this.state = 'idle'
+    }
   }
 
   /** Username for the sign-in screen, or null when signed out. The token is not included. */

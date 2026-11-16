@@ -124,7 +124,8 @@ describe('ChessApplication pass and play', () => {
     expect(hall.game.snapshot.outcome?.status).toBe('draw')
     const spoken = app()
     await spoken.app.listen()
-    expect(spoken.app.game.snapshot.moves).toEqual(['e2e4'])
+    expect(spoken.app.game.snapshot.moves).toEqual([])
+    expect(spoken.app.message).toMatch(/^Confirm /)
     await spoken.app.shell.signIn.begin()
     expect(spoken.app.shell.authPresenter.snapshot().phase).toBe('denied')
     const before = spoken.app.game

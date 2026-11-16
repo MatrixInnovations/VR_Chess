@@ -607,7 +607,7 @@ export class ChessClock {
     this.whiteMs = whiteMs
     this.blackMs = blackMs
     if (sideToMove === "white" || sideToMove === "black") this.active = sideToMove
-    if (this.held) return
+    if (this.held || this.phase === "paused") return
     this.running = true
     this.phase = "running"
     this.anchorMs = this.time.now()

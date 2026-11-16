@@ -133,16 +133,16 @@ describe('VoiceCommandInput', () => {
     speech.finalText = 'move pawn to e4'
     await input.start()
     expect(input.isActive()).toBe(true)
+    expect(session.submitMoveIntent).not.toHaveBeenCalled()
+    speech.finalText = 'yes'
+    input.processFinalTranscript()
     expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
     expect(session.submitMoveIntent).toHaveBeenCalledWith({
       from: 'e2',
       to: 'e4',
       source: 'voice',
     })
-    expect(session.requestOriginClarification).not.toHaveBeenCalled()
     expectNoBoardWrite(session)
-    input.processFinalTranscript()
-    expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
   })
 
   it('submits a later transcript from the recognizer and then refuses a second one until restart', async () => {
@@ -151,6 +151,7 @@ describe('VoiceCommandInput', () => {
     const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
     await input.start()
     speech.emit('knight to f3')
+    speech.emit('yes')
     expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
     expect(session.submitMoveIntent).toHaveBeenCalledWith({
       from: 'g1',
@@ -168,6 +169,7 @@ describe('VoiceCommandInput', () => {
 
     speech.finalText = 'knight to f3'
     await input.start()
+    speech.emit('yes')
     expect(session.submitMoveIntent).toHaveBeenCalledTimes(2)
     expectNoBoardWrite(session)
   })
@@ -197,7 +199,7 @@ describe('VoiceCommandInput', () => {
     await input.start()
     speech.emit('order a pizza')
     expect(session.submitMoveIntent).not.toHaveBeenCalled()
-    expect(session.requestOriginClarification).not.toHaveBeenCalled()
+    expect(session.requestOriginClarification).toHaveBeenCalled()
     expectNoBoardWrite(session)
   })
 
@@ -223,6 +225,8 @@ describe('VoiceCommandInput', () => {
     await input.start()
     speech.finalText = 'anywhere'
     input.processFinalTranscript()
+    speech.finalText = 'yes'
+    input.processFinalTranscript()
     expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
     expect(session.submitMoveIntent).toHaveBeenCalledWith({ to: 'e4', source: 'voice' })
     expectNoBoardWrite(session)
@@ -235,6 +239,7 @@ describe('VoiceCommandInput', () => {
     const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
     await input.start()
     speech.emit('pawn to e4')
+    speech.emit('yes')
     expect(session.submitMoveIntent).toHaveBeenCalledTimes(1)
     expectNoBoardWrite(session)
   })
@@ -350,6 +355,7 @@ describe('VoiceCommandInput session boundary', () => {
     const input = new VoiceCommandInput(speech, new ChessPhraseParser(), session)
     await input.start()
     speech.emit('pawn to e4')
+    speech.emit('yes')
     const calls = [
       session.legalMoves.mock.calls.length,
       session.submitMoveIntent.mock.calls.length,
@@ -358,7 +364,7 @@ describe('VoiceCommandInput session boundary', () => {
       session.setBoard.mock.calls.length,
       session.movePiece.mock.calls.length,
     ]
-    expect(calls).toEqual([1, 1, 0, 0, 0, 0])
+    expect(calls).toEqual([1, 1, 1, 0, 0, 0])
     const submitted = session.submitMoveIntent.mock.calls[0][0] as MoveIntent
     expect(submitted.source).toBe('voice')
   })

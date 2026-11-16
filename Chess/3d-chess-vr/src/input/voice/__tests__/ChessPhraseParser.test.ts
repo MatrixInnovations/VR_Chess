@@ -257,4 +257,40 @@ describe('ChessPhraseParser', () => {
     ]
     expect(parser.parse('from e2', legal)).toEqual([voice('e2', 'e4'), voice('e2', 'e3')])
   })
+
+  it('rejects an unknown word instead of dropping the piece filter', () => {
+    const legal: LegalMove[] = [
+      { from: 'f2', to: 'f3', piece: 'pawn' },
+      { from: 'h3', to: 'f4', piece: 'knight' },
+    ]
+    expect(parser.parse('night to f3', legal)).toEqual([])
+    expect(parser.parse('xyzzy to f3', legal)).toEqual([])
+    expect(parser.parse('pawn to e for', [{ from: 'e2', to: 'e4', piece: 'pawn' }, { from: 'd2', to: 'd4', piece: 'pawn' }])).toEqual([
+      voice('e2', 'e4'),
+    ])
+  })
+
+  it('maps piece and square homophones onto the legal move', () => {
+    const legal: LegalMove[] = [
+      { from: 'g1', to: 'f3', piece: 'knight' },
+      { from: 'f2', to: 'f3', piece: 'pawn' },
+      { from: 'h2', to: 'h4', piece: 'pawn' },
+    ]
+    expect(parser.parse('night to f3', legal)).toEqual([voice('g1', 'f3')])
+    expect(parser.parse('pawn to h ate', [{ from: 'h7', to: 'h8', piece: 'pawn' }])).toEqual([voice('h7', 'h8')])
+    expect(parser.parse('pawn to see 4', [{ from: 'c2', to: 'c4', piece: 'pawn' }])).toEqual([voice('c2', 'c4')])
+  })
+
+  it('keeps the corrected square and drops the retracted one', () => {
+    const legal: LegalMove[] = [
+      { from: 'g1', to: 'f3', piece: 'knight' },
+      { from: 'c2', to: 'c3', piece: 'pawn' },
+    ]
+    expect(parser.parse('knight to f3 actually c3', legal)).toEqual([voice('c2', 'c3')])
+  })
+
+  it('does not treat a destination word with no square as every move of that piece', () => {
+    const legal: LegalMove[] = [{ from: 'd1', to: 'd2', piece: 'queen' }]
+    expect(parser.parse('the queen moves to', legal)).toEqual([])
+  })
 })

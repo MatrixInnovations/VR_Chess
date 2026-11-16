@@ -34,7 +34,7 @@ export type ChallengeParams = SeekParams
  */
 export interface ILichessAuth {
   beginLogin(): Promise<{ authorizationUrl: string; state: string }>
-  completeLogin(callbackUrl: string): Promise<{ accessToken: string; username: string }>
+  completeLogin(callbackUrl: string): Promise<{ username: string }>
   logout(): Promise<void>
   getSession(): AuthSession | null
 }

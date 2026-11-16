@@ -40,7 +40,7 @@ export class MockLichessAuth implements ILichessAuth {
   }
 
   /** {@inheritdoc} */
-  async completeLogin(callbackUrl: string): Promise<{ accessToken: string; username: string }> {
+  async completeLogin(callbackUrl: string): Promise<{ username: string }> {
     this.lastCallbackUrl = callbackUrl
     if (this.failComplete === 'denied') {
       throw Object.assign(new Error('access denied'), { code: 'denied' })
@@ -52,7 +52,7 @@ export class MockLichessAuth implements ILichessAuth {
     if (!this.dropSession) {
       this.session = { username: 'vision-tester', expiresAt: null }
     }
-    return { accessToken: 'mock-access-token', username: 'token-user' }
+    return { username: 'token-user' }
   }
 
   /** {@inheritdoc} */

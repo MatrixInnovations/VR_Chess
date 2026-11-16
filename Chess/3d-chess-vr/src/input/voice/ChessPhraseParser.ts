@@ -37,6 +37,36 @@ export class ChessPhraseParser {
     six: '6',
     seven: '7',
     eight: '8',
+    for: '4',
+    fore: '4',
+    ate: '8',
+    won: '1',
+    too: '2',
+    sex: '6',
+  }
+
+  /** Mishearings that always mean a piece. Unknown words are still rejected. */
+  private static readonly PIECE_HOMOPHONES: Record<string, PieceKind> = {
+    night: 'knight',
+    nite: 'knight',
+    knite: 'knight',
+    rock: 'rook',
+    brook: 'rook',
+    pond: 'pawn',
+    prawn: 'pawn',
+    porn: 'pawn',
+  }
+
+  /** File-letter mishearings. Applied only when a rank follows. */
+  private static readonly FILE_HOMOPHONES: Record<string, string> = {
+    be: 'b',
+    bee: 'b',
+    see: 'c',
+    sea: 'c',
+    dee: 'd',
+    gee: 'g',
+    aitch: 'h',
+    eh: 'e',
   }
 
   private static readonly PIECE_WORDS: Record<string, PieceKind> = {
@@ -76,7 +106,6 @@ export class ChessPhraseParser {
     'ah',
     'hmm',
     'hm',
-    'eh',
     'please',
     'the',
     'an',
@@ -103,7 +132,6 @@ export class ChessPhraseParser {
     'then',
     'so',
     'well',
-    'actually',
     'basically',
     'yeah',
     'yes',
@@ -177,7 +205,7 @@ export class ChessPhraseParser {
       const compact = this.compactQuery(this.rawToken(phrase, tokens[0]))
       if (compact) return compact
     }
-    return this.scanWords(tokens)
+    return this.scanWords(this.afterCorrection(tokens))
   }
 
   /**
@@ -197,12 +225,15 @@ export class ChessPhraseParser {
     for (let index = 0; index < kept.length; index += 1) {
       const token = kept[index]
       const next = kept[index + 1]
-      if (/^[a-h]$/.test(token) && next && /^[1-8]$/.test(next)) {
-        merged.push(`${token}${next}`)
+      const file = this.fileOf(token)
+      const rank = next ? this.rankOf(next, Boolean(file)) : undefined
+      if (file && rank) {
+        merged.push(`${file}${rank}`)
         index += 1
         continue
       }
-      merged.push(token)
+      const homophone = ChessPhraseParser.PIECE_HOMOPHONES[token]
+      merged.push(homophone ?? token)
     }
     return merged
   }
@@ -211,17 +242,18 @@ export class ChessPhraseParser {
   private prepare(phrase: string): string {
     let text = phrase.toLowerCase().replace(/['’]/g, '')
     // Three-part castle notation has to be replaced before the two-part form, or `o-o-o` becomes two castles.
-    text = text.replace(/[0o]\s*-\s*[0o]\s*-\s*[0o]/g, ' queensidecastle ')
-    text = text.replace(/[0o]\s*-\s*[0o]/g, ' kingsidecastle ')
+    text = text.replace(/(?<![a-z])[0o]\s*-\s*[0o]\s*-\s*[0o](?![a-z])/g, ' queensidecastle ')
+    text = text.replace(/(?<![a-z])[0o]\s*-\s*[0o](?![a-z])/g, ' kingsidecastle ')
     text = text.replace(/[=]/g, ' equals ')
     text = text.replace(/-/g, ' ')
     text = text.replace(/[^a-z0-9\s]/g, ' ')
     text = text.replace(/\bcastling\b/g, 'castle')
     text = text.replace(/\bking\s+side\b/g, 'kingside')
     text = text.replace(/\bqueen\s+side\b/g, 'queenside')
-    text = text.replace(/\b(one|two|three|four|five|six|seven|eight)\b/g, (word) => {
-      return ChessPhraseParser.NUMBER_WORDS[word]
-    })
+    text = text.replace(
+      /\b(one|two|three|four|five|six|seven|eight|for|fore|ate|won|too|sex)\b/g,
+      (word) => ChessPhraseParser.NUMBER_WORDS[word] ?? word,
+    )
     return text.replace(/\s+/g, ' ').trim()
   }
 
@@ -366,7 +398,10 @@ export class ChessPhraseParser {
         continue
       }
       const piece = ChessPhraseParser.PIECE_WORDS[token]
-      if (!piece) continue
+      if (!piece) {
+        if (this.isIgnorable(token)) continue
+        return null
+      }
       sawChess = true
       if (!mover) {
         mover = piece
@@ -380,6 +415,7 @@ export class ChessPhraseParser {
     }
 
     if (!sawChess) return null
+    if (expectingTo && !to && !promotion) return null
     if (from && !to && !explicitFrom) {
       to = from
       from = undefined
@@ -393,6 +429,49 @@ export class ChessPhraseParser {
     if (mover) query.piece = mover
     if (promotion) query.promotion = promotion
     return query
+  }
+
+  /** Drop everything before the last self-correction so a retracted move is not played. */
+  private afterCorrection(tokens: string[]): string[] {
+    let start = 0
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index]
+      if (token === 'actually' || token === 'instead' || token === 'wait' || token === 'mean') {
+        start = index + 1
+      }
+    }
+    return tokens.slice(start)
+  }
+
+  /** File letter, or a homophone that is only a file when a rank follows. */
+  private fileOf(token: string): string | undefined {
+    if (/^[a-h]$/.test(token)) return token
+    return ChessPhraseParser.FILE_HOMOPHONES[token]
+  }
+
+  /**
+   * Rank digit. `to` and `two` count only immediately after a file, so the
+   * destination word `to` is left alone.
+   */
+  private rankOf(token: string, afterFile: boolean): string | undefined {
+    if (/^[1-8]$/.test(token)) return token
+    if (!afterFile) return undefined
+    if (token === 'to' || token === 'two') return '2'
+    return ChessPhraseParser.NUMBER_WORDS[token]
+  }
+
+  /** Words that are chess grammar but not a piece, square, or destination. */
+  private isIgnorable(token: string): boolean {
+    return (
+      token === 'side' ||
+      token === 'castle' ||
+      token === 'kingside' ||
+      token === 'queenside' ||
+      token === 'kingsidecastle' ||
+      token === 'queensidecastle' ||
+      token === 'long' ||
+      token === 'short'
+    )
   }
 
   /** Queen, rook, bishop, knight, or the UCI letters, once the phrase has said `promote` or `equals`. */

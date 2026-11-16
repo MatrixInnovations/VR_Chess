@@ -12,6 +12,8 @@ export interface HandJointSample {
   piece: PieceSnapshot | null
   clock: boolean
   world: Vec3 | null
+  /** Which hand produced the sample. Absent means the only hand. */
+  hand?: 'left' | 'right'
 }
 
 /**
@@ -28,6 +30,8 @@ export class HandTrackingInput implements IInputController {
   private attached = false
 
   private pinchHeld = false
+
+  private owner: 'left' | 'right' | null = null
 
   /**
    * Creates the instance.
@@ -54,6 +58,7 @@ export class HandTrackingInput implements IInputController {
   cancel(reason: CancelReason): void {
     this.grab.cancel(reason)
     this.pinchHeld = false
+    this.owner = null
   }
 
   /**
@@ -62,12 +67,14 @@ export class HandTrackingInput implements IInputController {
    */
   handle(sample: HandJointSample): void {
     if (!this.attached) return
+    if (this.owner && sample.hand && sample.hand !== this.owner) return
 
     if (!sample.tracked || sample.thumbTip === null || sample.indexTip === null) {
       // Only a held piece cancels through the session. A clock pinch that
       // loses tracking is not a move and must not look like one.
       if (this.grab.isGrabbing()) this.grab.cancel('tracking-loss')
       this.pinchHeld = false
+      this.owner = null
       return
     }
 
@@ -77,6 +84,7 @@ export class HandTrackingInput implements IInputController {
 
     if (pinching && !this.pinchHeld) {
       this.pinchHeld = true
+      this.owner = sample.hand ?? this.owner
       if (sample.piece) {
         this.grab.setSource(this.kind)
         this.grab.begin(sample.piece)
@@ -94,6 +102,7 @@ export class HandTrackingInput implements IInputController {
 
     if (!pinching && this.pinchHeld) {
       this.pinchHeld = false
+      this.owner = null
       if (this.grab.isGrabbing()) {
         this.grab.setSource(this.kind)
         this.grab.release(sample.square)

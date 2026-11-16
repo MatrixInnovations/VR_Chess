@@ -1,3 +1,5 @@
+import { Object3D, Quaternion, Vector3 } from 'three'
+
 import type { BoardPick } from '../mad-scientist/input/picking'
 import type { HandTrackingInput } from '../mad-scientist/input/HandTrackingInput'
 import type { XRControllerInput } from '../mad-scientist/input/XRControllerInput'
@@ -13,17 +15,37 @@ export interface LooseJoint {
  * The fields this hall reads off an XR input source.
  * The WebXR library's state is wider; only these members are used.
  */
+/** A WebXR pose transform. Position is meters. Orientation is a quaternion. */
+export interface XrTransform {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number }
+  readonly orientation: { readonly x: number; readonly y: number; readonly z: number; readonly w: number }
+}
+
+/**
+ * The slice of an XR frame the hall needs.
+ * Tests pass a fake. The page passes the real `XRFrame`.
+ */
+export interface XrFrameLike {
+  getPose?(space: unknown, referenceSpace: unknown): { transform: XrTransform } | null
+  getJointPose?(joint: unknown, referenceSpace: unknown): { transform: XrTransform } | null
+}
+
+/** One XR input source, shaped like react-three/xr 6.6. */
 export interface LooseXrInput {
   readonly id?: string
   readonly type?: string
   readonly handedness?: string
-  readonly inputSource?: { readonly handedness?: string; readonly gamepad?: { readonly buttons?: ReadonlyArray<{ readonly pressed?: boolean }> } }
-  readonly gamepad?: { readonly buttons?: ReadonlyArray<{ readonly pressed?: boolean }> }
-  readonly object?: {
-    getWorldPosition?: (target: { set: (x: number, y: number, z: number) => void }) => { x: number; y: number; z: number }
-    getWorldDirection?: (target: { set: (x: number, y: number, z: number) => void }) => { x: number; y: number; z: number }
+  readonly inputSource?: {
+    readonly handedness?: string
+    readonly targetRaySpace?: unknown
+    readonly gamepad?: { readonly buttons?: ReadonlyArray<{ readonly pressed?: boolean }> }
+    readonly hand?: { get(joint: string): unknown }
   }
-  readonly pose?: { readonly joints?: Readonly<Record<string, LooseJoint | undefined>> }
+  readonly gamepad?: { readonly buttons?: ReadonlyArray<{ readonly pressed?: boolean }> }
+  /** Grip-space model. Used only when no target-ray pose is available. */
+  readonly object?: Object3D
+  /** Gesture buffer from the XR library. It is not a joint map. */
+  readonly pose?: { readonly data?: Float32Array; readonly joints?: Readonly<Record<string, LooseJoint | undefined>> }
 }
 
 /**
@@ -31,55 +53,93 @@ export interface LooseXrInput {
  * Missing poses become an untracked source so a lost hand cancels instead of submitting.
  * @param inputs - `inputSourceStates` from the XR store.
  */
-export function readXrPoses(inputs: readonly LooseXrInput[]): XrPoseSource[] {
+const scratchOrigin = new Vector3()
+const scratchQuat = new Quaternion()
+const scratchDir = new Vector3()
+
+/**
+ * Aiming ray for an object. WebXR target rays point along local −Z, not +Z.
+ * @param object - A real three.js object. The matrix world is updated first.
+ * @returns Origin and the −Z direction. Never throws on a normal Object3D.
+ */
+export function poseFromObject(object: Object3D): { origin: Vec3; direction: Vec3 } {
+  object.updateWorldMatrix(true, false)
+  scratchOrigin.setFromMatrixPosition(object.matrixWorld)
+  scratchQuat.setFromRotationMatrix(object.matrixWorld)
+  scratchDir.set(0, 0, -1).applyQuaternion(scratchQuat)
+  return {
+    origin: { x: scratchOrigin.x, y: scratchOrigin.y, z: scratchOrigin.z },
+    direction: { x: scratchDir.x, y: scratchDir.y, z: scratchDir.z },
+  }
+}
+
+/**
+ * Project library input states into {@link XrPoseSource} values.
+ * Controller and hand aim come from `targetRaySpace` when a frame is present.
+ * @param inputs - `inputSourceStates` from the XR store.
+ * @param frame - Current XR frame, or null on the desktop.
+ * @param referenceSpace - Session reference space passed to `getPose`.
+ */
+export function readXrPoses(
+  inputs: readonly LooseXrInput[],
+  frame: XrFrameLike | null = null,
+  referenceSpace: unknown = null,
+): XrPoseSource[] {
   return inputs.map((input, index) => {
     const hand = input.handedness === 'left' || input.inputSource?.handedness === 'left' ? 'left' : 'right'
     const kind = input.type === 'hand' ? 'hand' : 'controller'
     const buttons = input.gamepad?.buttons ?? input.inputSource?.gamepad?.buttons
     const selecting = Boolean(buttons?.[0]?.pressed)
-    const origin = worldPoint(input.object?.getWorldPosition)
-    const direction = worldPoint(input.object?.getWorldDirection)
-    const thumb = joint(input, 'thumb-tip')
-    const indexTip = joint(input, 'index-finger-tip')
-    const tracked = input.type === 'hand' ? Boolean(thumb && indexTip) : Boolean(origin && direction)
+    const aimed = aimOf(input, frame, referenceSpace)
+    const thumb = jointPosition(input, frame, referenceSpace, 'thumb-tip')
+    const indexTip = jointPosition(input, frame, referenceSpace, 'index-finger-tip')
+    const tracked = kind === 'hand' ? Boolean(thumb && indexTip) : Boolean(aimed)
     return {
       id: input.id ?? `${kind}-${hand}-${index}`,
       kind,
       hand,
       selecting,
       tracked,
-      origin,
-      direction,
+      origin: aimed?.origin ?? null,
+      direction: aimed?.direction ?? null,
       thumbTip: thumb,
       indexTip,
     }
   })
 }
 
-function worldPoint(
-  read?: (target: { set: (x: number, y: number, z: number) => unknown }) => { x: number; y: number; z: number },
-): { x: number; y: number; z: number } | null {
-  if (typeof read !== 'function') return null
-  const target = {
-    x: 0,
-    y: 0,
-    z: 0,
-    set(x: number, y: number, z: number) {
-      this.x = x
-      this.y = y
-      this.z = z
-      return this
-    },
-  }
-  const result = read(target)
-  if (!result) return { x: target.x, y: target.y, z: target.z }
-  return { x: result.x, y: result.y, z: result.z }
+function aimOf(
+  input: LooseXrInput,
+  frame: XrFrameLike | null,
+  referenceSpace: unknown,
+): { origin: Vec3; direction: Vec3 } | null {
+  const space = input.inputSource?.targetRaySpace
+  const pose = space && frame?.getPose ? frame.getPose(space, referenceSpace) : null
+  if (pose) return rayFromTransform(pose.transform)
+  if (input.object) return poseFromObject(input.object)
+  return null
 }
 
-function joint(input: LooseXrInput, name: string): { x: number; y: number; z: number } | null {
-  const position = input.pose?.joints?.[name]?.position
-  if (!position) return null
+function jointPosition(
+  input: LooseXrInput,
+  frame: XrFrameLike | null,
+  referenceSpace: unknown,
+  name: string,
+): Vec3 | null {
+  const joint = input.inputSource?.hand?.get(name)
+  const pose = joint && frame?.getJointPose ? frame.getJointPose(joint, referenceSpace) : null
+  if (!pose) return null
+  const position = pose.transform.position
   return { x: position.x, y: position.y, z: position.z }
+}
+
+function rayFromTransform(transform: XrTransform): { origin: Vec3; direction: Vec3 } {
+  scratchQuat.set(transform.orientation.x, transform.orientation.y, transform.orientation.z, transform.orientation.w)
+  scratchDir.set(0, 0, -1).applyQuaternion(scratchQuat)
+  return {
+    origin: { x: transform.position.x, y: transform.position.y, z: transform.position.z },
+    direction: { x: scratchDir.x, y: scratchDir.y, z: scratchDir.z },
+  }
 }
 
 /** One controller or hand pose already in world meters. */
@@ -191,6 +251,7 @@ export class XrInputPump {
       piece: pick.piece,
       clock: pick.clock,
       world: pick.world,
+      hand: source.hand,
     })
   }
 

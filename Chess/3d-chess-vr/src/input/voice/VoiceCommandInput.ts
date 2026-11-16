@@ -15,6 +15,8 @@ export class VoiceCommandInput implements IInputController {
   private disposed = false
   /** One confirmed phrase per listening session. Restarting `start` clears it. */
   private consumed = false
+  private pendingIntent: MoveIntent | null = null
+  private pendingCandidates: MoveIntent[] | null = null
   /**
    * Bumped on every start and stop. An in-flight `start` compares this with the value
    * it captured so a dispose that wins the race cannot turn the controller back on.
@@ -120,16 +122,55 @@ export class VoiceCommandInput implements IInputController {
     const phrase = this.speech.readFinal()
     if (!phrase.trim()) return
     // Lock before submit so a listener re-entry cannot file a second intent for this phrase.
+    const normalized = phrase.trim().toLowerCase()
+    if (this.pendingIntent && (normalized === 'yes' || normalized === 'confirm' || normalized === 'yeah')) {
+      const pending = this.pendingIntent
+      this.pendingIntent = null
+      this.consumed = false
+      const accepted = this.session.submitMoveIntent(pending)
+      if (!accepted) this.session.requestOriginClarification([])
+      return
+    }
+    if (normalized === 'no' || normalized === 'cancel') {
+      this.pendingIntent = null
+      this.pendingCandidates = null
+      this.consumed = false
+      return
+    }
+    if (this.pendingCandidates && this.pendingCandidates.length > 1) {
+      const origin = normalized.replace(/[^a-h1-8]/g, '')
+      const narrowed = this.pendingCandidates.filter((candidate) => candidate.from === origin)
+      this.pendingCandidates = null
+      this.consumed = false
+      if (narrowed.length === 1) {
+        this.pendingIntent = narrowed[0]
+        this.session.requestOriginClarification([narrowed[0]])
+        return
+      }
+      if (narrowed.length > 1) {
+        this.pendingCandidates = narrowed
+        this.session.requestOriginClarification(narrowed)
+        return
+      }
+    }
     this.consumed = true
     const candidates = this.parser.parse(phrase, this.session.legalMoves()).map((candidate) => {
       return this.asVoiceIntent(candidate)
     })
-    if (candidates.length === 0) return
+    if (candidates.length === 0) {
+      this.consumed = false
+      this.session.requestOriginClarification([])
+      return
+    }
     if (candidates.length > 1) {
+      this.pendingCandidates = candidates
+      this.consumed = false
       this.session.requestOriginClarification(candidates)
       return
     }
-    this.session.submitMoveIntent(candidates[0])
+    this.pendingIntent = candidates[0]
+    this.consumed = false
+    this.session.requestOriginClarification([candidates[0]])
   }
 
   /** Force the voice channel even if a parser double returned another source. */

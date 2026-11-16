@@ -136,6 +136,7 @@ export class ChessApplication {
   private readonly bridge = new PickerBridge()
   private readonly picker: RaycastPicker
   private revisionValue = 0
+  private paintedClock = ''
   private readonly watchers = new Set<() => void>()
   private unlisten: (() => void) | null = null
   private surface: PointerSurface | null = null
@@ -145,7 +146,7 @@ export class ChessApplication {
    * @param options - Clock, XR, and Lichess ports. Defaults play a 10+0 game offline.
    */
   constructor(options: ChessApplicationOptions = {}) {
-    this.now = options.now ?? (() => Date.now())
+    this.now = options.now ?? (() => (typeof performance === 'undefined' ? Date.now() : performance.now()))
     this.offlineClock = {
       whiteMs: options.whiteMs ?? 10 * 60 * 1000,
       blackMs: options.blackMs ?? 10 * 60 * 1000,
@@ -206,10 +207,12 @@ export class ChessApplication {
       wasOffline: () => this.session.snapshot.mode === 'offline',
     })
     this.shell.navigator.showBoard(this.viewPort)
+    this.shell.navigator.subscribe(() => this.bump())
     this.shell.board.mountLive(this.viewPort, null, true)
     this.runtime = new HallRuntime({
       session: this.session,
       picker: this.bridge,
+      now: () => this.now(),
       onAccepted: (pieceId, to) => this.sync.hold(pieceId, to),
     })
     this.picker = new RaycastPicker(this.runtime.hall.camera, this.runtime.hall, { width: 1, height: 1 })
@@ -280,13 +283,21 @@ export class ChessApplication {
    * Advance the offline clock, slides, and the table-clock paint.
    * @param atMs - Timestamp. Tests pass the same clock as `now`.
    */
-  frame(atMs: number): void {
-    this.session.tick(atMs)
-    this.readModel.refresh(atMs)
-    this.runtime.frame(atMs)
+  frame(atMs?: number): void {
+    const at = atMs ?? this.now()
+    this.session.tick(at)
+    this.readModel.refresh(at)
+    this.runtime.frame(at)
     const fridae = this.readModel.fridae()
     if (fridae) this.physicalClock.apply(this.mirror.present(fridae))
     this.sync.reconcile()
+    const white = Math.floor(this.readModel.whiteMs / 1000)
+    const black = Math.floor(this.readModel.blackMs / 1000)
+    const painted = `${white}:${black}:${this.readModel.active}`
+    if (painted !== this.paintedClock) {
+      this.paintedClock = painted
+      this.bump()
+    }
   }
 
   /**
@@ -456,7 +467,60 @@ export class ChessApplication {
   /** Start the microphone. Denial is a status message, not an exception. */
   async listen(): Promise<void> {
     await this.voice.start()
-    this.message = this.voice.isActive() ? 'Listening. Try “move pawn to e4”.' : 'Voice is unavailable in this browser.'
+    const clarifying = this.message.startsWith('Confirm') || this.message.startsWith('Which') || this.message.startsWith("Didn't")
+    if (!clarifying) {
+      this.message = this.voice.isActive()
+        ? 'Listening. Voice uses your browser’s speech service. Try “move pawn to e4”.'
+        : 'Voice isn’t supported in this browser.'
+    }
+    this.bump()
+  }
+
+  /** Open the Lichess sign-in screen and redraw. */
+  openSignIn(): void {
+    this.shell.navigator.showSignIn()
+    this.bump()
+  }
+
+  /** Start PKCE and redraw when the authorize URL is ready. */
+  async beginSignIn(): Promise<void> {
+    await this.shell.signIn.begin()
+    this.bump()
+  }
+
+  /** Open the lobby from a stored session and redraw. */
+  openLobby(): void {
+    this.shell.signIn.continueWithSession()
+    this.bump()
+  }
+
+  /** Leave a screen for the board and redraw. */
+  backToBoard(): void {
+    this.shell.navigator.showBoard(this.viewPort)
+    this.bump()
+  }
+
+  /** Open the lobby screen and redraw. */
+  backToLobby(): void {
+    this.shell.navigator.showLobby()
+    this.bump()
+  }
+
+  /** Cancel a seek or challenge and redraw. */
+  cancelWait(): void {
+    void this.shell.waiting.cancel()
+    this.bump()
+  }
+
+  /** Ask the error screen to try the stream again and redraw. */
+  retryConnection(): void {
+    void this.shell.errors.retry()
+    this.bump()
+  }
+
+  /** Restart the tour and redraw. */
+  replayTour(): void {
+    this.tour.start()
     this.bump()
   }
 
@@ -471,8 +535,15 @@ export class ChessApplication {
    * @param href - The page URL.
    */
   async completeRedirectIfPresent(href: string): Promise<void> {
-    if (!href.includes('code=')) return
+    let url: URL
+    try {
+      url = new URL(href)
+    } catch {
+      return
+    }
+    if (!url.searchParams.has('code') || !url.searchParams.has('state')) return
     await this.shell.signIn.complete(href)
+    if (typeof history !== 'undefined') history.replaceState(null, '', `${url.pathname}${url.hash}`)
     this.bump()
   }
 
@@ -584,8 +655,13 @@ export class ChessApplication {
     this.host = new GameSessionHost()
     this.host.attach(session)
     this.viewPort = session.asViewPort()
-    this.modes = new ViewModeManager(this.viewPort, this.readModel)
-    this.toggle = new ModeToggleControl(this.modes, { isXrAvailable: () => true })
+    this.modes = new ViewModeManager(this.viewPort, this.readModel, this.modes.mode)
+    this.toggle = new ModeToggleControl(this.modes, {
+      isXrAvailable: () => {
+        const probe = this.xr as { isSupported?: () => boolean }
+        return probe.isSupported ? probe.isSupported() : true
+      },
+    })
     this.hud.setViewMode(this.modes.mode)
     this.shell.bindViewHost(new ViewModeHostAdapter(this.modes))
     const color = session.snapshot.ourColor === 'white' || session.snapshot.ourColor === 'black' ? session.snapshot.ourColor : null

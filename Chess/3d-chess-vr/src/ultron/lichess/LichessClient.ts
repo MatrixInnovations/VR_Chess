@@ -470,7 +470,6 @@ export class LichessClient {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       Accept: stream ? 'application/x-ndjson' : 'application/json',
-      'User-Agent': 'vr-chess-board/0.1',
     };
     if (body !== undefined) headers['Content-Type'] = 'application/x-www-form-urlencoded';
     this.log.write('lichess.request', `${method} ${url.split('?')[0]}`);

@@ -79,11 +79,27 @@ export class VoiceSessionPort implements IGameSessionMovePort {
    * @param candidates - Legal moves that fit the phrase.
    */
   requestOriginClarification(candidates: readonly MoveIntent[]): void {
-    const origins = candidates
-      .map((candidate) => candidate.from)
-      .filter((square): square is string => Boolean(square))
-    const list = origins.length > 0 ? origins.join(' or ') : 'the origin square'
-    this.onClarify(`Which piece? Say the square, for example ${list}.`)
+    if (candidates.length === 0) {
+      this.onClarify("Didn't catch that. Try again, for example pawn to e4.")
+      return
+    }
+    if (candidates.length === 1) {
+      const move = candidates[0]
+      this.onClarify(`Confirm ${move.from ?? 'that piece'} to ${move.to}. Say yes.`)
+      return
+    }
+    const origins = [...new Set(candidates.map((candidate) => candidate.from).filter(Boolean))]
+    if (origins.length <= 1) {
+      const promotions = [...new Set(candidates.map((candidate) => candidate.promotion).filter(Boolean))]
+      if (promotions.length > 1) {
+        this.onClarify(`Which piece should it become? ${promotions.join(' or ')}.`)
+        return
+      }
+      const destinations = [...new Set(candidates.map((candidate) => candidate.to))]
+      this.onClarify(`Which square? ${destinations.join(' or ')}.`)
+      return
+    }
+    this.onClarify(`Which piece? Say the square, for example ${origins.join(' or ')}.`)
   }
 
   private static named(letter: PromotionPiece | undefined): NamedPromotion | undefined {

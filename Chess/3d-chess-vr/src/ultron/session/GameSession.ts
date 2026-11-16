@@ -88,6 +88,8 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
   private blackOfferingDraw = false;
   private lastSignature = '';
   private pendingUci: string | null = null;
+  /** Index in the move list where the in-flight move must appear. */
+  private pendingPly = 0;
   /** Move list we have already estimated a clock for. A shorter stream prefix must not rewind it. */
   private optimisticMoves: readonly string[] = [];
   private lastTakebackKey = '';
@@ -285,9 +287,6 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
    */
   cancelPendingMove(reason: CancelReason): void {
     this.lastCancel = reason;
-    this.moveAbort?.abort();
-    this.seekAbort?.abort();
-    this.player?.cancelSeek();
   }
 
   /** @returns Copies of the pieces currently on the board. */
@@ -391,6 +390,9 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
       this.gameId = event.gameId;
       this.ourColor = event.color;
       this.boardCompatible = event.compatBoard !== false;
+      this.phase = 'playing';
+      this.snapshotValue = this.capture();
+      this.emit({ type: 'game-started', gameId: event.gameId });
       return;
     }
     if (event.type === 'challenge') this.emit({ type: 'challenge', challengeId: event.challengeId, action: 'received' });
@@ -496,6 +498,7 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
     const controller = new AbortController();
     this.moveAbort = controller;
     this.ledger.begin(id, uci, 'pending');
+    this.pendingPly = this.lastMoves.length;
     this.pendingUci = uci;
     const result = await this.player.playMove(this.gameId, uci, controller.signal);
     if (this.disposed || controller.signal.aborted || result.code === 'cancelled') {
@@ -547,8 +550,11 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
     return { ok: true, kind: 'resign-sent', commandId: id };
   }
 
-  private abort(id: string): SubmitResult {
+  private async abort(id: string): Promise<SubmitResult> {
     if (this.outcome || this.mode === 'offline') return { ok: false, reason: this.outcome ? 'terminal' : 'online-only' };
+    if (!this.player || !this.gameId) return { ok: false, reason: 'no-active-game' };
+    const result = await this.player.abortGame(this.gameId, new AbortController().signal);
+    if (!result.ok) return { ok: false, reason: 'rejected-by-lichess' };
     return { ok: true, kind: 'abort-sent', commandId: id };
   }
 
@@ -579,7 +585,7 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
     if (this.initialFen === 'startpos') this.pieces.replay(state.moves);
     this.lastSignature = signature;
     if (this.pendingUci) {
-      if (state.moves.includes(this.pendingUci)) {
+      if (state.moves[this.pendingPly] === this.pendingUci) {
         this.ledger.confirm(this.pendingUci);
         this.emit({ type: 'move-confirmed', uci: this.pendingUci });
         this.pendingUci = null;
@@ -612,6 +618,7 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
     this.outcome = null;
     this.positionVersion += 1;
     this.snapshotValue = this.capture();
+    this.emit({ type: 'position' });
     if (this.clockProvisional) {
       this.emit({ type: 'clock-provisional', color: state.wtime === 0 ? 'white' : 'black' });
     }
@@ -651,9 +658,14 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
   }
 
   private finish(status: GameStatusName, winner: Color | null): void {
+    if (this.outcome) {
+      this.snapshotValue = this.capture();
+      return;
+    }
     this.phase = 'finished';
     this.outcome = { status, winner };
     this.clockProvisional = false;
+    this.clock?.finish?.(status, winner);
     this.clock?.stop();
     this.positionVersion += 1;
     this.snapshotValue = this.capture();

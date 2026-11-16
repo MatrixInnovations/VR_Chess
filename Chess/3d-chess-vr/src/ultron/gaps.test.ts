@@ -192,7 +192,7 @@ describe('coverage gaps', () => {
     expect(parser.parse({ type: 'gameFull', id: 'a' }).kind).toBe('invalid');
     expect(parser.parse({ type: 'gameStart', game: { id: 'abc', color: 'white' } }).kind).toBe('incoming');
     expect(parser.parse({ type: 'opponentGone', gone: 'yes' }).kind).toBe('invalid');
-    expect(parser.parse({ type: 'unknown' }).kind).toBe('invalid');
+    expect(parser.parse({ type: 'unknown' }).kind).toBe('ignore');
   });
 
   it('drives the Lichess player methods and a gameStart watch', async () => {

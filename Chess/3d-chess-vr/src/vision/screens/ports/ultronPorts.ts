@@ -31,7 +31,7 @@ export interface ILichessAuth {
    * @param callbackUrl - Full redirect URL, including `code` and `state`.
    * @returns Token and username. Screens read {@link ILichessAuth.getSession}, not the token.
    */
-  completeLogin(callbackUrl: string): Promise<{ accessToken: string; username: string }>
+  completeLogin(callbackUrl: string): Promise<{ username: string }>
 
   /** End the Lichess session. */
   logout(): Promise<void>

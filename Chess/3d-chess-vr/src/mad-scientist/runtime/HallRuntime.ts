@@ -15,6 +15,8 @@ export interface HallRuntimeOptions {
   session: IGameSession
   picker: IPointerPicker
   logger?: PerformanceLogger
+  /** Clock shared with the session. Slides and frames must use this, not `Date.now`. */
+  now?: () => number
   /** Notified when a grab's move is accepted, before the slide. */
   onAccepted?: (pieceId: string, to: import('../contracts/types').Square) => void
 }
@@ -53,7 +55,9 @@ export class HallRuntime {
    */
   constructor(options: HallRuntimeOptions) {
     this.hall = new Hall({ pieces: options.session.getPieces() })
-    this.animator = new MoveAnimator(this.hall.board, { now: () => Date.now() })
+    this.animator = new MoveAnimator(this.hall.board, {
+      now: options.now ?? (() => performance.now()),
+    })
     this.budget = new PerformanceBudget({ logger: options.logger })
     this.grab = new PieceGrab({
       session: options.session,

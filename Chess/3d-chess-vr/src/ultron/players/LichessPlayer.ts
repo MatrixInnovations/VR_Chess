@@ -100,9 +100,11 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
    * @param challengeId - Challenge id.
    * @param signal - Abort signal.
    */
-  acceptChallenge(challengeId: string, signal: AbortSignal): Promise<TransportResult> {
+  async acceptChallenge(challengeId: string, signal: AbortSignal): Promise<TransportResult> {
+    const ready = await this.ensureStarted(signal);
+    if (!ready.ok) return ready;
     const token = this.tokens.getAccessToken();
-    if (!token) return Promise.resolve(TransportResult.fail('unauthorized', 'No access token'));
+    if (!token) return TransportResult.fail('unauthorized', 'No access token');
     return this.client.acceptChallenge(token, challengeId, signal);
   }
 
@@ -168,8 +170,7 @@ export class LichessPlayer extends Player implements IOnlinePlayer {
     this.accountLabel = account.username;
     this.inbox?.onAccount(account.username, account.id);
     this.events = new AbortController();
-    if (signal.aborted) this.events.abort();
-    else signal.addEventListener('abort', () => this.events?.abort(), { once: true });
+    if (signal.aborted) return TransportResult.fail('cancelled', 'Stream aborted');
     const opened = this.client.openEventStream(token, this.events.signal, {
       onEvent: (event) => {
         this.inbox?.onIncoming(event);

@@ -36,6 +36,15 @@ export class HallLighting {
     // 512 keeps the shadow pass inside the Quest frame. The hall is one table.
     this.key.shadow.mapSize.set(512, 512)
     this.key.shadow.bias = -0.0004
+    this.key.shadow.normalBias = 0.01
+    const shadowCamera = this.key.shadow.camera
+    shadowCamera.left = -0.5
+    shadowCamera.right = 0.5
+    shadowCamera.top = 0.5
+    shadowCamera.bottom = -0.5
+    shadowCamera.near = 1
+    shadowCamera.far = 3.5
+    shadowCamera.updateProjectionMatrix()
     this.key.target.position.set(0, BOARD_SURFACE_Y, 0)
 
     this.rim = new DirectionalLight(0xd7e2ff, 0.28)

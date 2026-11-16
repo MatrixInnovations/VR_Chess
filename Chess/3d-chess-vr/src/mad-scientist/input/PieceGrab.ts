@@ -108,7 +108,10 @@ export class PieceGrab {
     }
     this.submitted = false
     const model = this.pieces.get(piece.id)
-    if (model) model.applyFinish('selected')
+    if (model) {
+      model.applyFinish('selected')
+      model.object.userData.msHeld = true
+    }
     this.board.highlight(this.session.getLegalDestinations(piece.id))
     return true
   }
@@ -154,6 +157,7 @@ export class PieceGrab {
       this.onAccepted?.(piece.id, { file: target.file, rank: target.rank })
       const model = this.pieces.get(piece.id)
       if (model) {
+        model.object.userData.msHeld = false
         this.animator.cancel(model.id)
         model.snapToSquare(origin)
         model.applyFinish('idle')
@@ -194,6 +198,7 @@ export class PieceGrab {
     this.animator.cancel(pieceId)
     const model = this.pieces.get(pieceId)
     if (!model) return
+    model.object.userData.msHeld = false
     model.snapToSquare(square)
     model.applyFinish('idle')
   }

@@ -10,7 +10,10 @@ export class FetchHttpTransport implements IHttpTransport {
   /**
    * @param fetchImpl - `fetch` implementation. Tests pass a fake.
    */
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetchImpl: typeof fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+      globalThis.fetch(input, init)),
+  ) {}
 
   /**
    * Send one request.

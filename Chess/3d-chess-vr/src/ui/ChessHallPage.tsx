@@ -1,11 +1,12 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
-import { XR, useXR } from '@react-three/xr'
+import { XR, XROrigin, useXR } from '@react-three/xr'
 import { useEffect, useState, useSyncExternalStore, type ReactElement } from 'react'
 
 import { ChessApplication, type PointerSurface } from '../app/ChessApplication'
 import { readXrPoses, type LooseXrInput } from '../app/XrInputPump'
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
+import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
 
 /**
  * Props for {@link ChessHallPage}. Tests pass an application. The route boots one.
@@ -31,7 +32,8 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
-    global.__CHESS_APP__ = model
+    const expose = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_E2E === '1'
+    if (expose) global.__CHESS_APP__ = model
     void model.completeRedirectIfPresent(window.location.href)
     return () => {
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
@@ -62,7 +64,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           Black {formatMs(clock.black.remainingMs)}
         </p>
         <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
-        <p data-testid="session-id">{model.game.id}</p>
+        <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
         <p data-testid="presentation">{model.presentation}</p>
         {model.message ? <p data-testid="status-line">{model.message}</p> : null}
       </section>
@@ -112,7 +114,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         <div className="hall-panel">
           <h2>{waiting.title}</h2>
           <p>{waiting.detail}</p>
-          <button type="button" onClick={() => void model.shell.waiting.cancel()}>
+          <button type="button" onClick={() => model.cancelWait()}>
             Cancel
           </button>
         </div>
@@ -123,7 +125,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           <button type="button" onClick={() => model.newPassAndPlay()}>
             Pass and play
           </button>
-          <button type="button" onClick={() => model.shell.navigator.showLobby()}>
+          <button type="button" onClick={() => model.backToLobby()}>
             Lobby
           </button>
         </div>
@@ -132,7 +134,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         <div className="hall-panel">
           <h2>Connection</h2>
           <p>{error.message ?? 'The stream needs another try.'}</p>
-          <button type="button" onClick={() => void model.shell.errors.retry()}>
+          <button type="button" onClick={() => model.retryConnection()}>
             Retry
           </button>
         </div>
@@ -151,6 +153,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         >
           {store ? (
             <XR store={store}>
+              <XROrigin position={[0, 0, SEATED_EYE_Z_M]} />
               <HallTicker model={model} />
               <XrReader model={model} />
               <ChessHallView hall={model.runtime.hall} />
@@ -174,7 +177,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
  */
 function HallTicker({ model }: { model: ChessApplication }): null {
   useFrame(() => {
-    model.frame(typeof performance === 'undefined' ? Date.now() : performance.now())
+    model.frame()
   })
   return null
 }
@@ -212,16 +215,16 @@ function MenuPanel({ model }: { model: ChessApplication }): ReactElement {
       <button type="button" onClick={() => void model.declineDraw()}>
         Decline draw
       </button>
-      <button type="button" onClick={() => model.shell.navigator.showSignIn()}>
+      <button type="button" onClick={() => model.openSignIn()}>
         Lichess sign-in
       </button>
-      <button type="button" onClick={() => model.shell.signIn.continueWithSession()}>
+      <button type="button" onClick={() => model.openLobby()}>
         Lobby
       </button>
       <button
         type="button"
         onClick={() => {
-          model.tour.start()
+          model.replayTour()
         }}
       >
         Replay tour
@@ -252,10 +255,10 @@ function SignInPanel(props: {
           <a href={props.url}>Continue to Lichess</a>
         </p>
       ) : null}
-      <button type="button" onClick={() => void props.model.shell.signIn.begin()}>
+      <button type="button" onClick={() => void props.model.beginSignIn()}>
         Sign in
       </button>
-      <button type="button" onClick={() => props.model.shell.navigator.showBoard(props.model.view)}>
+      <button type="button" onClick={() => props.model.backToBoard()}>
         Back to the board
       </button>
       <p data-testid="sign-in-phase">{props.phase}</p>
@@ -291,7 +294,7 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
       <button type="button" onClick={() => props.model.shell.lobby.startOfflineDemo()}>
         Pass and play
       </button>
-      <button type="button" onClick={() => props.model.shell.navigator.showBoard(props.model.view)}>
+      <button type="button" onClick={() => props.model.backToBoard()}>
         Back to the board
       </button>
     </div>

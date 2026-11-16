@@ -18,6 +18,8 @@ export type SessionEvent =
   | { readonly type: 'reconciliation-error'; readonly message: string }
   | { readonly type: 'challenge'; readonly challengeId: string; readonly action: 'received' | 'canceled' | 'declined' }
   | { readonly type: 'seek'; readonly action: 'opened' | 'closed' }
+  | { readonly type: 'game-started'; readonly gameId: string }
+  | { readonly type: 'position' }
   | { readonly type: 'disposed' };
 
 /** Result of {@link IGameCommandSink.submit}. `ok` does not always mean Lichess has echoed the move. */

@@ -20,10 +20,10 @@ export class CommandLedger {
 
   /**
    * @param uci - UCI move.
-   * @returns Whether that move is in flight or already confirmed.
+   * @returns Whether that move is still in flight. A confirmed move can be played again later.
    */
   blocked(uci: string): boolean {
-    return this.uciState.has(uci);
+    return this.uciState.get(uci) === 'pending';
   }
 
   /**
@@ -40,9 +40,9 @@ export class CommandLedger {
    * @param uci - Move the stream now contains.
    */
   confirm(uci: string): void {
-    this.uciState.set(uci, 'confirmed');
+    this.uciState.delete(uci);
     for (const command of this.commands.values()) {
-      if (command.uci === uci) command.state = 'confirmed';
+      if (command.uci === uci && command.state !== 'rejected') command.state = 'confirmed';
     }
   }
 
