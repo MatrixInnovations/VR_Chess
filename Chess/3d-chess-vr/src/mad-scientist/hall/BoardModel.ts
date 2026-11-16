@@ -1,10 +1,10 @@
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3 } from 'three'
+import { BoxGeometry, BufferAttribute, Group, Mesh, PlaneGeometry, Vector3 } from 'three'
 import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import { isOnBoard, squareKey } from '../contracts/squares'
 import type { Square } from '../contracts/types'
 import { BOARD_SURFACE_Y, FRAME_WIDTH_M, INLAY_WIDTH_M, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
-import { PieceMaterialSet } from './PieceMaterialSet'
+import { PieceMaterialSet, type HallMaterial } from './PieceMaterialSet'
 
 /**
  * World position of a square's top-center, in meters.
@@ -31,9 +31,9 @@ export class BoardModel {
 
   private readonly squares = new Map<string, Mesh>()
 
-  private readonly baseMaterials = new Map<string, MeshStandardMaterial>()
+  private readonly baseMaterials = new Map<string, HallMaterial>()
 
-  private readonly highlightMaterial: MeshStandardMaterial
+  private readonly highlightMaterial: HallMaterial
 
   private readonly highlighted = new Set<string>()
 
@@ -75,7 +75,7 @@ export class BoardModel {
   clearHighlights(): void {
     for (const key of this.highlighted) {
       const mesh = this.squares.get(key) as Mesh
-      mesh.material = this.baseMaterials.get(key) as MeshStandardMaterial
+      mesh.material = this.baseMaterials.get(key) as HallMaterial
       mesh.visible = false
     }
     this.highlighted.clear()
@@ -210,7 +210,7 @@ export class BoardModel {
     this.addMerged('board-dark', darkParts, this.materials.boardSquare('dark'))
   }
 
-  private addMerged(name: string, parts: BoxGeometry[], material: MeshStandardMaterial): void {
+  private addMerged(name: string, parts: BoxGeometry[], material: HallMaterial): void {
     const geometry = mergeBufferGeometries(parts)
     for (const part of parts) part.dispose()
     if (!geometry) throw new Error(`${name} merge failed`)
@@ -228,11 +228,51 @@ export class BoardModel {
    * a is -X. Rank 1 is on white's near edge (+Z).
    */
   private buildCoordinates(span: number, frameTop: number): void {
-    const geometry = new PlaneGeometry(span, span)
+    const band = FRAME_WIDTH_M
+    const fraction = band / span
+    const y = frameTop + 0.0002
+    this.addCoordBand('board-coordinates-near', span, band, 0, y, span / 2 - band / 2, (uv) => {
+      uv.setY(0, fraction)
+      uv.setY(1, fraction)
+      uv.setY(2, 0)
+      uv.setY(3, 0)
+    })
+    this.addCoordBand('board-coordinates-far', span, band, 0, y, -span / 2 + band / 2, (uv) => {
+      uv.setY(0, 1)
+      uv.setY(1, 1)
+      uv.setY(2, 1 - fraction)
+      uv.setY(3, 1 - fraction)
+    })
+    this.addCoordBand('board-coordinates-left', band, span, -span / 2 + band / 2, y, 0, (uv) => {
+      uv.setX(0, 0)
+      uv.setX(1, fraction)
+      uv.setX(2, 0)
+      uv.setX(3, fraction)
+    })
+    this.addCoordBand('board-coordinates-right', band, span, span / 2 - band / 2, y, 0, (uv) => {
+      uv.setX(0, 1 - fraction)
+      uv.setX(1, 1)
+      uv.setX(2, 1 - fraction)
+      uv.setX(3, 1)
+    })
+  }
+
+  /** One frame-band strip. The playing squares are not covered, so they are shaded once. */
+  private addCoordBand(
+    name: string,
+    width: number,
+    height: number,
+    x: number,
+    y: number,
+    z: number,
+    remap: (uv: BufferAttribute) => void,
+  ): void {
+    const geometry = new PlaneGeometry(width, height)
+    remap(geometry.getAttribute('uv') as BufferAttribute)
     const plane = new Mesh(geometry, this.materials.coords())
-    plane.name = 'board-coordinates'
+    plane.name = name
     plane.rotation.x = -Math.PI / 2
-    plane.position.y = frameTop + 0.0002
+    plane.position.set(x, y, z)
     plane.raycast = () => undefined
     this.object.add(plane)
     this.geometries.push(geometry)

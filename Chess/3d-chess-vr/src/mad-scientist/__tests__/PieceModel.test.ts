@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Group, MeshPhysicalMaterial } from 'three'
+import { Group, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial, MixOperation } from 'three'
 
 import type { PieceKind } from '../contracts/types'
 import { BoardModel } from '../hall/BoardModel'
@@ -20,8 +20,8 @@ describe('PieceMaterialSet', () => {
 
     expect(white).not.toBe(black)
     expect(white.color.getHex()).not.toBe(black.color.getHex())
-    expect(selected.emissiveIntensity).toBeGreaterThan(0)
-    expect(white.emissiveIntensity).toBe(0)
+    expect((selected as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
+    expect(white).not.toHaveProperty('emissiveIntensity')
     expect(dragging.transparent).toBe(true)
     expect(dragging.opacity).toBeLessThan(1)
   })
@@ -34,8 +34,6 @@ describe('PieceMaterialSet', () => {
     const black = set.get('black', 'idle')
     const budget = set.gpuBudget()
 
-    const creamCoat = cream as MeshPhysicalMaterial
-    const marbleCoat = marble as MeshPhysicalMaterial
     expect(cream).not.toBe(marble)
     expect(cream.color.getHex()).toBe(0xffffff)
     expect(marble.color.getHex()).toBe(0xffffff)
@@ -43,39 +41,31 @@ describe('PieceMaterialSet', () => {
     const marblePixel = (marble.map as { image: { data: Uint8Array } }).image.data
     expect(creamPixel[0]).toBeGreaterThan(180)
     expect(marblePixel[0]).toBeLessThan(80)
-    expect(cream.metalness).toBe(0)
-    expect(marble.metalness).toBe(0)
-    expect(cream.roughness).toBeCloseTo(0.16)
-    expect(marble.roughness).toBeCloseTo(0.12)
-    expect(creamCoat.clearcoat).toBeCloseTo(0.95)
-    expect(marbleCoat.clearcoat).toBe(1)
-    expect(white.metalness).toBe(1)
-    expect(black.metalness).toBeCloseTo(0.8)
-    expect(white.roughness).toBeCloseTo(0.08)
-    expect(black.roughness).toBeCloseTo(0.08)
-    expect(black.envMapIntensity).toBeCloseTo(2)
+    expect(cream).toBeInstanceOf(MeshBasicMaterial)
+    expect(marble).toBeInstanceOf(MeshBasicMaterial)
+    expect(white).toBeInstanceOf(MeshBasicMaterial)
+    expect(black).toBeInstanceOf(MeshBasicMaterial)
+    expect((white as MeshBasicMaterial).combine).toBe(MixOperation)
+    expect((white as MeshBasicMaterial).reflectivity).toBeCloseTo(0.3)
     expect(white.color.getHex()).toBe(0xd4d7dc)
     expect(black.color.getHex()).toBe(0xc06a38)
-    expect(white.roughnessMap).toBeTruthy()
-    expect(white.roughnessMap).toBe(black.roughnessMap)
-    expect(white.normalMap).toBe(black.normalMap)
+    expect(set.get('black', 'selected')).toBeInstanceOf(MeshStandardMaterial)
+    expect((set.get('black', 'selected') as MeshStandardMaterial).metalness).toBeCloseTo(0.8)
     expect(set.gold().color.getHex()).toBe(0xc9a44c)
-    expect(set.felt().roughness).toBeCloseTo(0.95)
-    expect(set.felt().metalness).toBe(0)
+    expect(set.felt()).toBeInstanceOf(MeshLambertMaterial)
     const before = budget.textureCount
     expect(before).toBeGreaterThan(0)
     expect(before).toBeLessThanOrEqual(48)
-    const saved = white.roughnessMap
-    white.roughnessMap = null
+    const saved = cream.map
+    cream.map = null
     expect(set.gpuBudget().textureCount).toBe(before - 1)
-    white.roughnessMap = saved
+    cream.map = saved
     expect(set.gpuBudget().textureCount).toBe(before)
     expect(budget.materialCount).toBeLessThanOrEqual(24)
     expect(budget.materialCount).toBeGreaterThan(6)
     expect(PerformanceBudget.QUEST_PRO_FLOOR_FPS).toBe(72)
     expect(PerformanceBudget.QUEST_PRO_TARGET_FPS).toBe(90)
     expect(white.map).toBeNull()
-    expect(black.normalMap).toBeTruthy()
   })
 })
 
@@ -95,7 +85,7 @@ describe('PieceModel', () => {
     const idle = pawn.currentMaterial()
     pawn.applyFinish('selected')
     expect(pawn.currentMaterial()).not.toBe(idle)
-    expect(pawn.currentMaterial().emissiveIntensity).toBeGreaterThan(0)
+    expect((pawn.currentMaterial() as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
 
     materials.apply(pawn, 'white', 'dragging')
     expect(pawn.currentMaterial().transparent).toBe(true)

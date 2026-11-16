@@ -1,8 +1,8 @@
-import { Group, Mesh, MeshStandardMaterial } from 'three'
+import { Group, Mesh } from 'three'
 
 import type { PieceColor, PieceFinish, PieceKind, PieceSnapshot, Square, Vec3 } from '../contracts/types'
 import type { BoardModel } from './BoardModel'
-import type { PieceMaterialSet } from './PieceMaterialSet'
+import type { HallMaterial, PieceMaterialSet } from './PieceMaterialSet'
 import { pieceGeometry } from './PieceGeometryCache'
 
 /**
@@ -61,8 +61,8 @@ export class PieceModel {
   }
 
   /** Material currently on the first mesh. */
-  currentMaterial(): MeshStandardMaterial {
-    return this.owned[0].material as MeshStandardMaterial
+  currentMaterial(): HallMaterial {
+    return this.owned[0].material as HallMaterial
   }
 
   /** Swap every mesh onto the shared material for `finish`. */

@@ -16,6 +16,13 @@ import { SiteCredit } from './SiteCredit'
 
 const boardProbePoint = new Vector3()
 
+/** Screenshots and the pixel probe need the buffer. The live view does not. */
+function keepDrawingBuffer(): boolean {
+  if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search)
+  return params.get('probe') === '1' || params.get('effects') === '1'
+}
+
 /**
  * Props for {@link ChessHallPage}. Tests pass an application. The route boots one.
  */
@@ -181,7 +188,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         {mounted ? <Canvas
           dpr={typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent) ? 1 : [1, 1.5]}
           shadows="percentage"
-          gl={{ preserveDrawingBuffer: true, antialias: true }}
+          gl={{ preserveDrawingBuffer: keepDrawingBuffer(), antialias: false }}
           camera={model.runtime.hall.camera}
           onCreated={(state: RootState) => {
             const gl = state.gl as WebGLRenderer

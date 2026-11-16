@@ -3,7 +3,6 @@ import {
   Group,
   LinearFilter,
   Mesh,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
   sRGBEncoding,
@@ -58,13 +57,12 @@ export class PhysicalChessClock {
     const rimGeo = new PlaneGeometry(0.172, 0.082)
     this.rim = new Mesh(
       rimGeo,
-      new MeshPhysicalMaterial({
+      new MeshStandardMaterial({
         color: 0xf0d78a,
         emissive: 0xc9a44c,
         emissiveIntensity: 0.55,
         metalness: 0.55,
         roughness: 0.18,
-        clearcoat: 0.25,
       }),
     )
     this.rim.name = 'clock-rim'

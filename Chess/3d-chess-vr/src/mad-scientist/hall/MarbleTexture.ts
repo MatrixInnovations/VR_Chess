@@ -10,17 +10,6 @@ import {
 } from 'three'
 
 /**
- * Runtime marble. Pixel data only, so the page does not fetch an image
- * and the production script policy stays `'self'`.
- */
-/** 2K on desktop, smaller on Quest and in unit tests. */
-export function marbleResolution(): number {
-  if (typeof process !== 'undefined' && process.env.VITEST) return 64
-  if (typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)) return 256
-  return 2048
-}
-
-/**
  * Champagne glyphs for the 32 mm frame band.
  * The rest of the texture is transparent so the marble and gold show through.
  * Pixel y = 0 is white's near edge (+Z). a is at -X. Rank 1 is nearest white.
@@ -230,32 +219,6 @@ const FONT: Record<string, readonly string[]> = {
   '6': ['01110', '10000', '10000', '11110', '10001', '10001', '01110'],
   '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
   '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
-}
-
-/** Shared micro-scratch maps so every metal piece uses one roughness and one normal. */
-export function scratchMaps(): { roughness: DataTexture; normal: DataTexture } {
-  const size = Math.min(128, marbleResolution())
-  const rough = new Uint8Array(size * size * 4)
-  const normal = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const n = fbm(x * 0.15, y * 0.15)
-      const scratch = Math.abs(Math.sin(x * 0.7 + n * 6)) > 0.97 ? 0.35 : 0
-      const i = (y * size + x) * 4
-      const value = clamp(210 + n * 30 + scratch * 16)
-      rough[i] = value
-      rough[i + 1] = value
-      rough[i + 2] = value
-      rough[i + 3] = 255
-      const dx = fbm((x + 1) * 0.15, y * 0.15) - fbm((x - 1) * 0.15, y * 0.15)
-      const dy = fbm(x * 0.15, (y + 1) * 0.15) - fbm(x * 0.15, (y - 1) * 0.15)
-      normal[i] = clamp(128 + dx * 90)
-      normal[i + 1] = clamp(128 + dy * 90)
-      normal[i + 2] = 255
-      normal[i + 3] = 255
-    }
-  }
-  return { roughness: publish(rough, size), normal: publish(normal, size) }
 }
 
 /** Keeps the texture type in the public signature without importing it twice. */

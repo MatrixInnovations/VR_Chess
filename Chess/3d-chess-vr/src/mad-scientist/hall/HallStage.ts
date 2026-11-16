@@ -14,13 +14,13 @@ import {
   type WebGLRenderer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 
-import { createBoardReflector } from './BoardReflector'
 import { bakeMarbleGpu } from './MarbleVeins'
 import { buildEnvironment, darkHallEnvScene } from './HallEnvironment'
 import type { ChessHall } from './ChessHall'
@@ -72,7 +72,6 @@ export function configureHallStage(
   const xr = gl.xr as { addEventListener?: (type: string, listener: () => void) => void } | undefined
   if (!quest) {
     hall.frameDesktop()
-    RectAreaLightUniformsLib.init()
     scene.fog = new FogExp2(0x0b0908, 0.045)
     const controls = new OrbitControls(camera, gl.domElement)
     controls.target.set(0, BOARD_SURFACE_Y, -0.09)
@@ -87,16 +86,19 @@ export function configureHallStage(
     controls.update()
     hall.orbit = controls
     if (hooks?.effects !== false) {
-      const reflector = createBoardReflector()
-      hall.board.object.add(reflector)
-      hall.reflector = reflector
-      hall.materials.setMirrorBlend(true)
       const composer = new EffectComposer(gl)
       composer.addPass(new RenderPass(scene, camera))
       composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.97))
+      const fxaa = new ShaderPass(FXAAShader)
+      composer.addPass(fxaa)
       const css = new Vector2()
       if (typeof gl.getSize === 'function') gl.getSize(css)
-      if (css.x > 0 && css.y > 0) composer.setSize(css.x, css.y)
+      if (css.x > 0 && css.y > 0) {
+        composer.setSize(css.x, css.y)
+        const bloomPass = composer.passes[1] as { setSize?: (width: number, height: number) => void }
+        bloomPass.setSize?.(Math.max(1, Math.floor(css.x / 2)), Math.max(1, Math.floor(css.y / 2)))
+        fxaa.material.uniforms.resolution.value.set(1 / css.x, 1 / css.y)
+      }
       hall.grade = composer
     }
   }
@@ -106,9 +108,9 @@ export function configureHallStage(
     bakeMarbleGpu(gl, hall.materials, quest)
   })
   const starter = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
-  scene.environment = starter
+  hall.materials.bindReflections(starter)
   if (typeof gl.compile === 'function') gl.compile(scene, camera)
-  if (!quest) loadStudioEnvironment(scene, gl, hooks)
+  if (!quest && hooks?.loader) loadStudioEnvironment(scene, gl, hall, hooks)
   const desktopGrade = hall.grade
   const desktopFog = scene.fog
   xr?.addEventListener?.('sessionstart', () => {
@@ -130,7 +132,7 @@ export function configureHallStage(
 }
 
 /** Load the self-hosted studio HDR. A failed read falls back to the softbox scene. */
-export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: StudioHooks): void {
+export function loadStudioEnvironment(_scene: Scene, gl: WebGLRenderer, hall: ChessHall, hooks?: StudioHooks): void {
   const loader = hooks?.loader ?? { load: loadStudioHdr }
   const bake = hooks?.bake
   loader.load(
@@ -141,20 +143,14 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
       const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, color: 0xffffff, side: BackSide }))
       sphere.rotation.y = 0.35
       room.add(sphere)
-      replaceEnvironment(scene, buildEnvironment(gl, room, bake))
+      hall.materials.bindReflections(buildEnvironment(gl, room, bake))
       hdr.dispose()
     },
     undefined,
     () => {
-      replaceEnvironment(scene, buildEnvironment(gl, darkHallEnvScene(), bake))
+      hall.materials.bindReflections(buildEnvironment(gl, darkHallEnvScene(), bake))
     },
   )
-}
-
-function replaceEnvironment(scene: Scene, next: Texture): void {
-  const previous = scene.environment
-  scene.environment = next
-  if (previous && previous !== next) previous.dispose()
 }
 
 function loadStudioHdr(

@@ -104,9 +104,9 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix) {
  * The live materials then sample those textures instead of running the noise per pixel,
  * and the page does not spend tens of seconds baking them on the CPU.
  */
-export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, quest: boolean): void {
+export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _quest: boolean): void {
   if (typeof gl.setRenderTarget !== 'function' || typeof gl.render !== 'function') return
-  const size = quest ? 512 : 2048
+  const size = 512
   const started = typeof performance !== 'undefined' ? performance.now() : 0
   const light = renderMarble(gl, size, 8, false, 1)
   const dark = renderMarble(gl, size, 8, true, 0.85)
@@ -136,7 +136,7 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
     magFilter: LinearFilter,
     minFilter: mipmaps ? LinearMipmapLinearFilter : LinearFilter,
     generateMipmaps: mipmaps,
-    anisotropy: mipmaps ? 8 : 1,
+    anisotropy: 1,
     wrapS: RepeatWrapping,
     wrapT: RepeatWrapping,
     encoding: sRGBEncoding,

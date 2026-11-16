@@ -4,7 +4,6 @@ import {
   CylinderGeometry,
   Group,
   Mesh,
-  MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
   TorusGeometry,
@@ -21,7 +20,7 @@ import {
   SEATED_EYE_Z_M,
   TABLE_TOP_Y,
 } from './metrics'
-import { PieceMaterialSet } from './PieceMaterialSet'
+import { PieceMaterialSet, type HallMaterial } from './PieceMaterialSet'
 import { disposePieceGeometries } from './PieceGeometryCache'
 import { PieceModel } from './PieceModel'
 import { TableDecals } from './TableDecals'
@@ -406,7 +405,7 @@ export class ChessHall {
     name: string,
     size: Vec3,
     position: Vec3,
-    material: MeshStandardMaterial,
+    material: HallMaterial,
     parent: Object3D,
     receiveShadow: boolean,
     castShadow = false,
