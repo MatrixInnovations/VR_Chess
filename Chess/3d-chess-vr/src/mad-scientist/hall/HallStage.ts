@@ -98,17 +98,26 @@ export function configureHallStage(
       hall.grade = composer
     }
   }
-  if (quest) {
-    scene.environment = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
-  } else {
-    loadStudioEnvironment(scene, gl, hooks)
-  }
+  const starter = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
+  scene.environment = starter
+  if (typeof gl.compile === 'function') gl.compile(scene, camera)
+  if (!quest) loadStudioEnvironment(scene, gl, hooks)
+  const desktopGrade = hall.grade
+  const desktopFog = scene.fog
   xr?.addEventListener?.('sessionstart', () => {
     hall.setTier('quest')
     hall.grade = null
     scene.fog = null
     if (hall.orbit) hall.orbit.enabled = false
     if (hall.reflector) hall.reflector.visible = false
+  })
+  xr?.addEventListener?.('sessionend', () => {
+    if (quest) return
+    hall.setTier('desktop')
+    hall.grade = desktopGrade
+    scene.fog = desktopFog
+    if (hall.orbit) hall.orbit.enabled = true
+    if (hall.reflector) hall.reflector.visible = true
   })
 }
 
@@ -124,14 +133,20 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
       const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, side: BackSide }))
       sphere.rotation.y = 0.35
       room.add(sphere)
-      scene.environment = buildEnvironment(gl, room, bake)
+      replaceEnvironment(scene, buildEnvironment(gl, room, bake))
       hdr.dispose()
     },
     undefined,
     () => {
-      scene.environment = buildEnvironment(gl, darkHallEnvScene(), bake)
+      replaceEnvironment(scene, buildEnvironment(gl, darkHallEnvScene(), bake))
     },
   )
+}
+
+function replaceEnvironment(scene: Scene, next: Texture): void {
+  const previous = scene.environment
+  scene.environment = next
+  if (previous && previous !== next) previous.dispose()
 }
 
 function loadStudioHdr(

@@ -7,7 +7,7 @@ import {
   Texture,
 } from 'three'
 
-import { bakeMarble, coordinateBorderTexture, marbleBakeSize, scratchMaps } from './MarbleTexture'
+import { bakeMarble, contactFalloffTexture, coordinateBorderTexture, marbleBakeSize, scratchMaps } from './MarbleTexture'
 
 import type { PieceColor, PieceFinish } from '../contracts/types'
 
@@ -253,8 +253,9 @@ export class PieceMaterialSet {
     if (!this.contactMaterial) {
       this.contactMaterial = new MeshBasicMaterial({
         color: 0x000000,
+        map: this.keep(contactFalloffTexture()),
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.35,
         depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -1,

@@ -1,11 +1,20 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { pngStats } from './pngStats'
+
+async function waitForDrawnFrame(page: Page): Promise<void> {
+  await expect.poll(async () => page.locator('canvas').getAttribute('data-frame'), { timeout: 60_000 }).toBe('1')
+}
+
+async function waitForNextFrame(page: Page): Promise<void> {
+  const before = await page.locator('canvas').getAttribute('data-frames')
+  await expect.poll(async () => page.locator('canvas').getAttribute('data-frames'), { timeout: 60_000 }).not.toBe(before)
+}
 
 test('pass and play moves the clock and the immersive switch keeps the session', async ({ page }) => {
   await page.goto('/')
   await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
-  await page.waitForTimeout(600)
+  await waitForDrawnFrame(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/hall-seated.png', fullPage: false })
 
   await page.evaluate(() => {
@@ -16,7 +25,7 @@ test('pass and play moves the clock and the immersive switch keeps the session',
     app.tourSkip()
     app.selectPiece('white-pawn-5')
   })
-  await page.waitForTimeout(400)
+  await waitForNextFrame(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/legal-moves.png', fullPage: false })
 
   const before = await page.getByTestId('session-id').innerText()
@@ -36,11 +45,11 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await expect(page.getByTestId('clock-active')).toHaveText('black')
 
   await page.getByRole('button', { name: '3D / Immersive' }).click()
-  await page.waitForTimeout(500)
+  await waitForNextFrame(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/immersive-toggle.png', fullPage: false })
   await expect(page.getByTestId('session-id')).toHaveText(before)
   await expect(page.getByTestId('clock-active')).toHaveText('black')
-  await page.waitForSelector('canvas[data-frame="1"]')
+  await waitForDrawnFrame(page)
   const sample = pngStats(await page.locator('canvas').screenshot())
   expect(sample.mean).toBeGreaterThan(12)
   expect(sample.variance).toBeGreaterThan(4)

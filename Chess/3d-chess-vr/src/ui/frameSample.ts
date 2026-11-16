@@ -27,7 +27,8 @@ export interface FrameSampleGl {
  */
 export function publishFrameSample(gl: FrameSampleGl): void {
   const canvas = gl.domElement
-  if (!canvas?.dataset || canvas.dataset.frame === '1') return
+  if (!canvas?.dataset) return
   if (canvas.width < 16 || canvas.height < 16) return
   canvas.dataset.frame = '1'
+  canvas.dataset.frames = String(Number(canvas.dataset.frames ?? '0') + 1)
 }

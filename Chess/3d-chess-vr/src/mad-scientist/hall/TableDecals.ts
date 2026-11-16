@@ -1,9 +1,9 @@
 import {
+  CircleGeometry,
   DynamicDrawUsage,
   InstancedMesh,
   Matrix4,
   Object3D,
-  PlaneGeometry,
   Quaternion,
   Vector3,
 } from 'three'
@@ -46,8 +46,8 @@ export class TableDecals {
   constructor(parent: Object3D, materials: PieceMaterialSet) {
     const layFlat = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2)
     this.flat = layFlat
-    const feltGeometry = new PlaneGeometry(1, 1)
-    const contactGeometry = new PlaneGeometry(1, 1)
+    const feltGeometry = new CircleGeometry(0.5, 32)
+    const contactGeometry = new CircleGeometry(0.5, 32)
     this.felt = new InstancedMesh(feltGeometry, materials.felt(), 32)
     this.contact = new InstancedMesh(contactGeometry, materials.contact(), 32)
     this.felt.name = 'piece-felt'

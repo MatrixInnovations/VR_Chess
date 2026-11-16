@@ -171,6 +171,7 @@ describe('hall stage', () => {
       getPixelRatio() {
         return 1
       },
+      compile: vi.fn(),
       xr: {
         addEventListener(type: string, listener: () => void) {
           listeners[type] = listener
@@ -196,10 +197,16 @@ describe('hall stage', () => {
     expect((gl as { toneMapping?: number }).toneMapping).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)
+    expect((gl as unknown as { compile: ReturnType<typeof vi.fn> }).compile).toHaveBeenCalledTimes(1)
     listeners.sessionstart()
     expect(hall.reflector?.visible).toBe(false)
     expect(hall.orbit?.enabled).toBe(false)
     expect(scene.fog).toBeNull()
+    listeners.sessionend()
+    expect(hall.reflector?.visible).toBe(true)
+    expect(hall.orbit?.enabled).toBe(true)
+    expect(scene.fog).toBeTruthy()
+    expect(hall.grade).toBeTruthy()
     hall.dispose()
   })
 
@@ -212,7 +219,14 @@ describe('hall stage', () => {
       disposed = true
     }
     const environment = new Texture()
-    configureHallStage({} as WebGLRenderer, scene, hall.camera, hall, true, {
+    const listeners: Record<string, () => void> = {}
+    configureHallStage({
+      xr: {
+        addEventListener(type: string, listener: () => void) {
+          listeners[type] = listener
+        },
+      },
+    } as unknown as WebGLRenderer, scene, hall.camera, hall, true, {
       loader: {
         load(_url, onLoad) {
           onLoad?.(hdr)
@@ -224,6 +238,9 @@ describe('hall stage', () => {
     expect(scene.environment).toBe(environment)
     expect(hall.reflector).toBeNull()
     expect(hall.grade).toBeNull()
+    expect(hall.camera.fov).toBe(50)
+    listeners.sessionend()
+    expect(hall.reflector).toBeNull()
     expect(hall.camera.fov).toBe(50)
     hall.dispose()
   })

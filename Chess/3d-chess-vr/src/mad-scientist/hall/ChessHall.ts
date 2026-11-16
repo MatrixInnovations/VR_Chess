@@ -303,7 +303,9 @@ export class ChessHall {
     const gold = this.materials.gold()
     const stone = this.materials.boardFrame()
     for (const radius of [1.15, 1.85, 2.45]) {
-      const ring = new Mesh(new TorusGeometry(radius, 0.006, 8, 72), gold)
+      const ringGeometry = new TorusGeometry(radius, 0.006, 8, 72)
+      this.geometries.push(ringGeometry)
+      const ring = new Mesh(ringGeometry, gold)
       ring.name = `floor-ring-${radius}`
       ring.rotation.x = Math.PI / 2
       ring.position.y = 0.061
@@ -327,7 +329,9 @@ export class ChessHall {
       shaft.castShadow = false
       group.add(shaft)
       for (const height of [0.22, 1.15, 2.45]) {
-        const band = new Mesh(new TorusGeometry(0.135, 0.018, 8, 20), gold)
+        const bandGeometry = new TorusGeometry(0.135, 0.018, 8, 20)
+        this.geometries.push(bandGeometry)
+        const band = new Mesh(bandGeometry, gold)
         band.position.y = height
         band.raycast = () => undefined
         group.add(band)

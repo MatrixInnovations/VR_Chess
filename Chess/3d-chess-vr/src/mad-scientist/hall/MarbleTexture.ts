@@ -11,34 +11,6 @@ export function marbleResolution(): number {
   return 2048
 }
 
-export function marbleTexture(tone: 'black' | 'cream'): DataTexture {
-  const size = marbleResolution()
-  const data = new Uint8Array(size * size * 4)
-  const black = tone === 'black'
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const warp = fbm(x * 0.03, y * 0.03)
-      const n = fbm(x * 0.02 + warp * 3.5, y * 0.02 - warp * 2.2)
-      const vein = Math.pow(Math.abs(Math.sin((x * 0.045 + warp * 8) + n * 14)), 10)
-      const hair = Math.pow(Math.abs(Math.sin(y * 0.08 + n * 9)), 14)
-      const i = (y * size + x) * 4
-      if (black) {
-        const spark = vein > 0.55 || hair > 0.72 ? 170 + n * 70 : vein * 40
-        data[i] = clamp(14 + n * 10 + spark)
-        data[i + 1] = clamp(14 + n * 10 + spark)
-        data[i + 2] = clamp(16 + n * 12 + spark)
-      } else {
-        const shade = vein > 0.62 || hair > 0.78 ? 55 : vein * 18
-        data[i] = clamp(236 - n * 14 - shade)
-        data[i + 1] = clamp(228 - n * 16 - shade)
-        data[i + 2] = clamp(214 - n * 18 - shade * 0.6)
-      }
-      data[i + 3] = 255
-    }
-  }
-  return publish(data, size)
-}
-
 /**
  * Champagne glyphs for the 32 mm frame band.
  * The rest of the texture is transparent so the marble and gold show through.
@@ -68,12 +40,12 @@ export function paintCoordinateGlyphs(ctx: CanvasRenderingContext2D, size: numbe
   const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
   for (let index = 0; index < 8; index += 1) {
     const along = band + ((index + 0.5) / 8) * (size - band * 2)
-    ctx.fillText(files[index], along, band / 2)
     ctx.save()
-    ctx.translate(along, size - band / 2)
+    ctx.translate(along, band / 2)
     ctx.rotate(Math.PI)
     ctx.fillText(files[index], 0, 0)
     ctx.restore()
+    ctx.fillText(files[index], along, size - band / 2)
     ctx.save()
     ctx.translate(band / 2, along)
     ctx.rotate(-Math.PI / 2)
@@ -96,6 +68,7 @@ function coordinateCanvasTexture(size: number): CanvasTexture {
   paintCoordinateGlyphs(ctx, size)
   const texture = new CanvasTexture(canvas)
   texture.encoding = sRGBEncoding
+  texture.anisotropy = 8
   texture.flipY = false
   texture.needsUpdate = true
   return texture
@@ -108,14 +81,34 @@ function coordinateDataTexture(size: number): DataTexture {
   const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
   for (let index = 0; index < 8; index += 1) {
     const along = band + ((index + 0.5) / 8) * (size - band * 2)
-    stamp(data, size, files[index], along, band / 2)
+    stamp(data, size, files[index], along, band / 2, true)
     stamp(data, size, files[index], along, size - band / 2)
     stamp(data, size, ranks[index], band / 2, along)
     stamp(data, size, ranks[index], size - band / 2, along)
   }
   const texture = publish(data, size)
+  texture.anisotropy = 8
   texture.flipY = false
   return texture
+}
+
+/** Soft radial alpha for the contact disc. The center is opaque and the rim fades out. */
+export function contactFalloffTexture(): DataTexture {
+  const size = 64
+  const data = new Uint8Array(size * size * 4)
+  const center = (size - 1) / 2
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const radius = Math.min(1, Math.hypot((x - center) / center, (y - center) / center))
+      const alpha = Math.round(255 * (1 - radius) ** 1.6)
+      const index = (y * size + x) * 4
+      data[index] = 255
+      data[index + 1] = 255
+      data[index + 2] = 255
+      data[index + 3] = alpha
+    }
+  }
+  return publish(data, size)
 }
 
 function publish(data: Uint8Array, size: number): DataTexture {
@@ -127,7 +120,7 @@ function publish(data: Uint8Array, size: number): DataTexture {
   return texture
 }
 
-function stamp(data: Uint8Array, size: number, glyph: string, cx: number, cy: number): void {
+function stamp(data: Uint8Array, size: number, glyph: string, cx: number, cy: number, turned = false): void {
   const rows = FONT[glyph]
   if (!rows) return
   const scale = 3
@@ -137,7 +130,9 @@ function stamp(data: Uint8Array, size: number, glyph: string, cx: number, cy: nu
   const top = Math.round(cy - height / 2)
   for (let row = 0; row < rows.length; row += 1) {
     for (let col = 0; col < rows[row].length; col += 1) {
-      if (rows[row][col] !== '1') continue
+      const srcRow = turned ? rows.length - 1 - row : row
+      const srcCol = turned ? rows[row].length - 1 - col : col
+      if (rows[srcRow][srcCol] !== '1') continue
       for (let dy = 0; dy < scale; dy += 1) {
         for (let dx = 0; dx < scale; dx += 1) {
           const x = left + col * scale + dx

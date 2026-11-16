@@ -118,6 +118,7 @@ export class HallLighting {
     camera.bottom = -span
     camera.updateProjectionMatrix()
     this.rect.intensity = desktop ? 0.7 : 0
+    this.rect.visible = desktop
     if (desktop) this.object.add(this.rect)
     else this.rect.removeFromParent()
   }

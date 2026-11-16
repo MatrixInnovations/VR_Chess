@@ -29,12 +29,12 @@ export function buildKnightHead(): ExtrudeGeometry {
   const geometry = new ExtrudeGeometry(knightShape(), {
     depth: 0.009,
     steps: 1,
-    curveSegments: 4,
+    curveSegments: 8,
     bevelEnabled: true,
     bevelThickness: 0.0015,
     bevelSize: 0.001,
     bevelOffset: 0,
-    bevelSegments: 2,
+    bevelSegments: 3,
   })
   geometry.translate(0, 0, -0.0045)
   shapeKnight(geometry)

@@ -40,13 +40,13 @@ export function carveMitreSlit(geometry: BufferGeometry): BufferGeometry {
     const x = position.getX(index)
     const y = position.getY(index)
     const z = position.getZ(index)
-    if (y < 0.0405 || y > 0.0535) continue
+    if (y < 0.042 || y > 0.056) continue
     const theta = Math.atan2(z, x)
     const centre = ((y - 0.047) / 0.0065) * 0.3
     const distance = Math.abs(theta - centre)
-    const halfWidth = 0.55
+    const halfWidth = 0.9
     if (distance < halfWidth) {
-      const pull = 1 - 0.72 * (1 - distance / halfWidth)
+      const pull = 1 - 0.9 * (1 - distance / halfWidth)
       position.setXYZ(index, x * pull, y, z * pull)
     }
   }
@@ -66,10 +66,7 @@ function build(kind: PieceKind): BufferGeometry {
     case 'queen':
       return merge([lathe('queen'), new SphereGeometry(0.0037, 10, 6).translate(0, 0.0707, 0)])
     case 'bishop':
-      return merge([
-        carveMitreSlit(lathe('bishop')),
-        box(0.0008, 0.014, 0.012, 0.006, 0.048, 0, 0.35),
-      ])
+      return merge([carveMitreSlit(lathe('bishop'))])
     case 'knight':
       return merge([lathe('knightBase'), buildKnightHead()])
     case 'rook': {
