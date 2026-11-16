@@ -73,13 +73,15 @@ function coordinateCanvasTexture(size: number): CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { alpha: true })
   if (!ctx) throw new Error('no 2d context')
   paintCoordinateGlyphs(ctx, size)
   const texture = new CanvasTexture(canvas)
   texture.encoding = sRGBEncoding
   texture.anisotropy = 8
   texture.flipY = true
+  texture.premultiplyAlpha = false
+  texture.format = RGBAFormat
   texture.needsUpdate = true
   return texture
 }

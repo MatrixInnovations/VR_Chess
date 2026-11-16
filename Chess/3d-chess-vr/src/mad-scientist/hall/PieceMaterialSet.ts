@@ -137,7 +137,7 @@ export class PieceMaterialSet {
         clearcoat: 0,
         envMapIntensity: 0.2,
         transparent: true,
-        alphaTest: 0.5,
+        alphaTest: 0.35,
       }),
     )
     this.put(
