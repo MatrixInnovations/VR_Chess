@@ -8,6 +8,7 @@ import { readXrPoses, type LooseXrInput, type XrFrameLike } from '../app/XrInput
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
 import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
+import { SiteCredit } from './SiteCredit'
 
 /**
  * Props for {@link ChessHallPage}. Tests pass an application. The route boots one.
@@ -171,6 +172,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           )}
         </Canvas>
       </div>
+      <SiteCredit />
     </main>
   )
 }

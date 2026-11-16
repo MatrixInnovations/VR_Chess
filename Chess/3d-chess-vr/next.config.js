@@ -1,3 +1,5 @@
+const staticExport = process.env.STATIC_EXPORT === '1'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -11,7 +13,15 @@ const nextConfig = {
     // command is not the gate.
     ignoreDuringBuilds: true,
   },
-  async headers() {
+}
+
+// `output: 'export'` cannot serve custom headers. Netlify sets STATIC_EXPORT=1
+// for a static publish. The default build keeps the CSP headers.
+if (staticExport) {
+  nextConfig.output = 'export'
+  nextConfig.images = { unoptimized: true }
+} else {
+  nextConfig.headers = async function headers() {
     // `next dev` compiles the page with eval. Production responses stay on 'self'.
     const devScripts = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-inline' 'unsafe-eval'"
     return [
@@ -37,7 +47,7 @@ const nextConfig = {
         ],
       },
     ]
-  },
+  }
 }
 
 module.exports = nextConfig
