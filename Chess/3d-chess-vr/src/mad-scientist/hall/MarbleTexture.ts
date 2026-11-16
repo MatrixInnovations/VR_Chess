@@ -1,4 +1,4 @@
-import { DataTexture, RGBAFormat, RepeatWrapping, sRGBEncoding, Texture } from 'three'
+import { CanvasTexture, DataTexture, RGBAFormat, RepeatWrapping, sRGBEncoding, Texture } from 'three'
 
 /**
  * Runtime marble. Pixel data only, so the page does not fetch an image
@@ -43,9 +43,65 @@ export function marbleTexture(tone: 'black' | 'cream'): DataTexture {
  * Champagne glyphs for the 32 mm frame band.
  * The rest of the texture is transparent so the marble and gold show through.
  * Pixel y = 0 is white's near edge (+Z). a is at -X. Rank 1 is nearest white.
+ * Browsers get a 2048 Georgia canvas. Tests and SSR keep a small data texture.
  */
-export function coordinateBorderTexture(): DataTexture {
-  const size = 512
+export function coordinateBorderTexture(): Texture {
+  if (typeof document !== 'undefined') {
+    try {
+      return coordinateCanvasTexture(2048)
+    } catch {
+      return coordinateDataTexture(256)
+    }
+  }
+  return coordinateDataTexture(256)
+}
+
+/** Draws a–h and 1–8. Cap height is 48px, about 0.011 m on the 0.464 m board. */
+export function paintCoordinateGlyphs(ctx: CanvasRenderingContext2D, size: number): void {
+  ctx.clearRect(0, 0, size, size)
+  ctx.fillStyle = '#E8D4B0'
+  ctx.font = '400 48px Georgia'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const band = (0.032 / 0.464) * size
+  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+  const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
+  for (let index = 0; index < 8; index += 1) {
+    const along = band + ((index + 0.5) / 8) * (size - band * 2)
+    ctx.fillText(files[index], along, band / 2)
+    ctx.save()
+    ctx.translate(along, size - band / 2)
+    ctx.rotate(Math.PI)
+    ctx.fillText(files[index], 0, 0)
+    ctx.restore()
+    ctx.save()
+    ctx.translate(band / 2, along)
+    ctx.rotate(-Math.PI / 2)
+    ctx.fillText(ranks[index], 0, 0)
+    ctx.restore()
+    ctx.save()
+    ctx.translate(size - band / 2, along)
+    ctx.rotate(Math.PI / 2)
+    ctx.fillText(ranks[index], 0, 0)
+    ctx.restore()
+  }
+}
+
+function coordinateCanvasTexture(size: number): CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('no 2d context')
+  paintCoordinateGlyphs(ctx, size)
+  const texture = new CanvasTexture(canvas)
+  texture.encoding = sRGBEncoding
+  texture.flipY = false
+  texture.needsUpdate = true
+  return texture
+}
+
+function coordinateDataTexture(size: number): DataTexture {
   const data = new Uint8Array(size * size * 4)
   const band = Math.round((0.032 / 0.464) * size)
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -160,9 +216,9 @@ export function scratchMaps(): { roughness: DataTexture; normal: DataTexture } {
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const n = fbm(x * 0.15, y * 0.15)
-      const scratch = Math.abs(Math.sin(x * 0.7 + n * 6)) > 0.92 ? 0.35 : 0
+      const scratch = Math.abs(Math.sin(x * 0.7 + n * 6)) > 0.97 ? 0.35 : 0
       const i = (y * size + x) * 4
-      const value = clamp(210 + n * 30 + scratch * 40)
+      const value = clamp(210 + n * 30 + scratch * 16)
       rough[i] = value
       rough[i + 1] = value
       rough[i + 2] = value

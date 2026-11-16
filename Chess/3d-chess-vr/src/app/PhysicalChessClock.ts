@@ -1,10 +1,26 @@
-import { CanvasTexture, Group, Mesh, MeshStandardMaterial, PlaneGeometry, sRGBEncoding } from 'three'
+import {
+  CanvasTexture,
+  Group,
+  Mesh,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  sRGBEncoding,
+} from 'three'
 
-import type { IClockFaceSnapshot, IClockSideFace } from '../mad-scientist/hall/ClockViewMirror'
+import type { ClockFaceExpiry, IClockFaceSnapshot, IClockSideFace } from '../mad-scientist/hall/ClockViewMirror'
 import { ClockMaterials } from '../mad-scientist/hall/ClockMaterials'
 
+const FACE_INK: Record<ClockFaceExpiry, { background: string; digit: string }> = {
+  running: { background: '#141210', digit: '#f3efe6' },
+  'provisional-expired': { background: '#c9a44c', digit: '#0e0e10' },
+  'confirmed-flag': { background: '#8e2d2d', digit: '#f3efe6' },
+  'offline-local-flag': { background: '#c06a38', digit: '#0e0e10' },
+  'no-clock': { background: '#0e0e10', digit: '#d4af37' },
+}
+
 /**
- * Wooden chess clock on the table.
+ * Metal chess clock on the table, with a thin gold rim.
  *
  * Face colors come from {@link ClockMaterials}. Digits are painted from the
  * label Fridae already formatted, at most a few times a second.
@@ -17,6 +33,7 @@ export class PhysicalChessClock {
 
   private readonly materials = new ClockMaterials()
   private readonly body: Mesh
+  private readonly rim: Mesh
   private readonly whiteFace: Mesh
   private readonly blackFace: Mesh
   private readonly faces: Record<'white' | 'black', FacePaint> = {
@@ -36,9 +53,18 @@ export class PhysicalChessClock {
     this.body.castShadow = true
     this.body.receiveShadow = true
     this.body.userData.msRole = 'clock'
+    const rimGeo = new PlaneGeometry(0.172, 0.082)
+    this.rim = new Mesh(
+      rimGeo,
+      new MeshPhysicalMaterial({ color: 0xc9a44c, metalness: 1, roughness: 0.22, clearcoat: 0.15 }),
+    )
+    this.rim.name = 'clock-rim'
+    this.rim.rotation.x = -Math.PI / 2
+    this.rim.position.y = 0.016
+    this.rim.raycast = () => undefined
     this.whiteFace = this.face(-0.038)
     this.blackFace = this.face(0.038)
-    this.object.add(this.body, this.whiteFace, this.blackFace)
+    this.object.add(this.rim, this.body, this.whiteFace, this.blackFace)
   }
 
   /**
@@ -55,6 +81,8 @@ export class PhysicalChessClock {
   dispose(): void {
     this.object.removeFromParent()
     this.body.geometry.dispose()
+    this.rim.geometry.dispose()
+    ;(this.rim.material as MeshStandardMaterial).dispose()
     this.whiteFace.geometry.dispose()
     this.blackFace.geometry.dispose()
     for (const face of [this.faces.white, this.faces.black]) {
@@ -78,7 +106,7 @@ export class PhysicalChessClock {
     mesh.userData.clockLabel = face.label
     mesh.userData.clockSide = side
     if (paint.signature === signature) return
-    const drawn = this.redraw(paint, face.label, face.expiry === 'no-clock')
+    const drawn = this.redraw(paint, face.label, face.expiry)
     paint.signature = signature
     if (!drawn) {
       mesh.material = this.materials.forExpiry(face.expiry)
@@ -86,21 +114,17 @@ export class PhysicalChessClock {
     }
     if (!paint.material) {
       paint.material = this.materials.forExpiry(face.expiry).clone()
-      paint.material.map = paint.texture
-      paint.material.color.set('#ffffff')
-    } else {
-      const source = this.materials.forExpiry(face.expiry)
-      paint.material.color.copy(source.color)
-      paint.material.emissive.copy(source.emissive)
-      paint.material.emissiveIntensity = source.emissiveIntensity
-      paint.material.map = paint.texture
     }
+    paint.material.color.set('#ffffff')
+    paint.material.emissive.set('#000000')
+    paint.material.emissiveIntensity = 0
+    paint.material.map = paint.texture
     mesh.material = paint.material
     mesh.userData.clockPainted = face.label
   }
 
   /** Draw into the one canvas this face already owns. */
-  private redraw(paint: FacePaint, label: string, muted: boolean): boolean {
+  private redraw(paint: FacePaint, label: string, expiry: ClockFaceExpiry): boolean {
     if (typeof document === 'undefined') return false
     if (!paint.canvas) {
       paint.canvas = document.createElement('canvas')
@@ -114,9 +138,10 @@ export class PhysicalChessClock {
       return false
     }
     if (!context) return false
-    context.fillStyle = muted ? '#8d939c' : '#14181e'
+    const ink = FACE_INK[expiry]
+    context.fillStyle = ink.background
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
-    context.fillStyle = muted ? '#2a3038' : '#f4efe4'
+    context.fillStyle = ink.digit
     context.font = 'bold 72px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'

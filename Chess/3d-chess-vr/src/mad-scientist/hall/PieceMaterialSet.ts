@@ -84,11 +84,11 @@ export class PieceMaterialSet {
     const glyphs = this.keep(coordinateBorderTexture())
 
     this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0.08, 0.06, 2.15))
-    this.put('black:idle', this.metal(0xc06a38, 0.14, 0, 0, 1, 0.1, 0.08, 1.95))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 0.1, 0.08, 1.6))
     this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0.08, 0.06, 2.15))
-    this.put('black:selected', this.metal(0xc06a38, 0.14, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.95))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.12, 1, 0.1, 0.08, 1.6))
     this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0.08, 0.06, 2.15))
-    this.put('black:dragging', this.metal(0xc06a38, 0.14, 0, 0, 0.7, 0.1, 0.08, 1.95))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 0.1, 0.08, 1.6))
 
     this.put('board:light', this.marble(0xf0ebe3, uv, 0.16, 0.95, 0.08, 1.15, new Vector2(0.04, 0.04), false))
     this.put('board:dark', this.marble(0x0b0b0c, uv, 0.12, 1, 0.06, 1.45, new Vector2(0.035, 0.035), true))
@@ -134,7 +134,15 @@ export class PieceMaterialSet {
       }),
     )
 
-    this.put('room:floor', this.marble(0x0a0a0b, uv, 0.16, 0.85, 0.1, 1.2, new Vector2(0.035, 0.035), true))
+    this.put('room:floor', this.marble(0x0a0a0b, uv, 0.32, 0.4, 0.18, 0.65, new Vector2(0.035, 0.035), true))
+    this.put('room:table', this.make({
+      color: 0x0b0b0c,
+      roughness: 0.32,
+      metalness: 0,
+      clearcoat: 0.45,
+      clearcoatRoughness: 0.16,
+      envMapIntensity: 0.7,
+    }))
     this.put('room:plaster', this.make({ color: 0x12100e, roughness: 0.55, metalness: 0, clearcoat: 0.15, clearcoatRoughness: 0.4, envMapIntensity: 0.6 }))
     this.put('room:ceiling', this.make({ color: 0x0c0b0a, roughness: 0.7, metalness: 0, clearcoat: 0.05, clearcoatRoughness: 0.6, envMapIntensity: 0.4 }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
@@ -187,6 +195,11 @@ export class PieceMaterialSet {
   /** Dark felt under a piece base. */
   felt(): MeshStandardMaterial {
     return this.table.get('piece:felt') as MeshStandardMaterial
+  }
+
+  /** Black marble table top. Separate from the board so the table stays dimmer. */
+  tableTop(): MeshStandardMaterial {
+    return this.table.get('room:table') as MeshStandardMaterial
   }
 
   /** Black marble floor. */
@@ -258,8 +271,8 @@ export class PieceMaterialSet {
     const desktop = tier === 'desktop'
     const light = this.boardSquare('light')
     const dark = this.boardSquare('dark')
-    light.opacity = desktop ? 0.9 : 1
-    dark.opacity = desktop ? 0.78 : 1
+    light.opacity = desktop ? 0.82 : 1
+    dark.opacity = desktop ? 0.7 : 1
     light.transparent = desktop
     dark.transparent = desktop
     light.depthWrite = !desktop

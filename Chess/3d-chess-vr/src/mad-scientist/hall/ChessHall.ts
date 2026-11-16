@@ -258,7 +258,7 @@ export class ChessHall {
       'table',
       { x: 1.3, y: 0.04, z: 0.9 },
       { x: 0, y: tableTop - 0.02, z: 0 },
-      this.materials.boardFrame(),
+      this.materials.tableTop(),
       room,
       true,
       true,

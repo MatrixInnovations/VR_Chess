@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { BoxGeometry, LatheGeometry, MeshPhysicalMaterial, Scene, Texture } from 'three'
 import type { WebGLRenderer } from 'three'
 
@@ -9,6 +9,7 @@ import type { PieceKind } from '../contracts/types'
 import { createBoardReflector } from '../hall/BoardReflector'
 import { buildEnvironment, darkHallEnvScene } from '../hall/HallEnvironment'
 import { KING_HEIGHT_M } from '../hall/metrics'
+import { coordinateBorderTexture, paintCoordinateGlyphs } from '../hall/MarbleTexture'
 import { applyMarbleVeins, stampTileSeed } from '../hall/MarbleVeins'
 import { carveMitreSlit, disposePieceGeometries, pieceGeometry } from '../hall/PieceGeometryCache'
 import { LATHE_SEGMENTS, PROFILE } from '../hall/PieceProfiles'
@@ -36,6 +37,74 @@ describe('marble veins', () => {
     expect(material.customProgramCacheKey()).toBe('marble-light')
     geometry.dispose()
     material.dispose()
+  })
+})
+
+describe('coordinate glyphs', () => {
+  it('paints antialiased Georgia letters in champagne', () => {
+    const drawn: string[] = []
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      textAlign: '',
+      textBaseline: '',
+      clearRect() {
+        return undefined
+      },
+      fillText(text: string) {
+        drawn.push(text)
+      },
+      save() {
+        return undefined
+      },
+      restore() {
+        return undefined
+      },
+      translate() {
+        return undefined
+      },
+      rotate() {
+        return undefined
+      },
+    }
+    paintCoordinateGlyphs(ctx as unknown as CanvasRenderingContext2D, 2048)
+    expect(ctx.font).toBe('400 48px Georgia')
+    expect(ctx.fillStyle).toBe('#E8D4B0')
+    expect(drawn.filter((glyph) => glyph === 'a').length).toBeGreaterThan(0)
+    expect(drawn).toContain('1')
+    expect(drawn).toContain('h')
+  })
+
+  it('builds a canvas texture when a 2d context exists', () => {
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      textAlign: '',
+      textBaseline: '',
+      clearRect() {
+        return undefined
+      },
+      fillText() {
+        return undefined
+      },
+      save() {
+        return undefined
+      },
+      restore() {
+        return undefined
+      },
+      translate() {
+        return undefined
+      },
+      rotate() {
+        return undefined
+      },
+    }
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
+    const texture = coordinateBorderTexture()
+    expect(texture.image).toBeTruthy()
+    texture.dispose()
+    spy.mockRestore()
   })
 })
 
@@ -120,6 +189,11 @@ describe('hall stage', () => {
     expect(hall.camera.fov).toBe(42)
     expect(hall.camera.position.z).toBeCloseTo(0.92)
     expect(hall.reflector).toBeTruthy()
+    expect(hall.grade).toBeTruthy()
+    const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
+    expect(bloom.strength).toBeCloseTo(0.15)
+    expect(bloom.threshold).toBeCloseTo(0.92)
+    expect((gl as { toneMapping?: number }).toneMapping).toBeTruthy()
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBe(environment)
     listeners.sessionstart()
@@ -146,10 +220,57 @@ describe('hall stage', () => {
       },
       bake: () => ({ texture: environment }),
     })
-    expect(disposed).toBe(true)
+    expect(disposed).toBe(false)
     expect(scene.environment).toBe(environment)
     expect(hall.reflector).toBeNull()
+    expect(hall.grade).toBeNull()
     expect(hall.camera.fov).toBe(50)
+    hall.dispose()
+  })
+})
+
+describe('desktop stage without the mirror', () => {
+  it('still sets tone mapping, the hero camera, fog, and the environment', () => {
+    const hall = new ChessHall()
+    const scene = new Scene()
+    const gl = {
+      domElement: {
+        style: {},
+        addEventListener() {
+          return undefined
+        },
+        removeEventListener() {
+          return undefined
+        },
+      },
+      getSize(target: { set: (x: number, y: number) => void }) {
+        target.set(320, 200)
+        return target
+      },
+      getPixelRatio() {
+        return 1
+      },
+      setPixelRatio() {
+        return undefined
+      },
+    } as unknown as WebGLRenderer
+    const environment = new Texture()
+    configureHallStage(gl, scene, hall.camera, hall, false, {
+      effects: false,
+      loader: {
+        load(_url, _onLoad, _progress, onError) {
+          onError?.()
+        },
+      },
+      bake: () => ({ texture: environment }),
+    })
+    expect(hall.reflector).toBeNull()
+    expect(hall.grade).toBeNull()
+    expect(hall.camera.fov).toBe(42)
+    expect(hall.orbit).toBeTruthy()
+    expect(scene.fog).toBeTruthy()
+    expect(scene.environment).toBe(environment)
+    expect((gl as { outputEncoding?: number }).outputEncoding).toBeTruthy()
     hall.dispose()
   })
 })

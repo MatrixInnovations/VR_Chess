@@ -103,13 +103,13 @@ export class HallLighting {
   }
 
   /**
-   * Desktop uses a 2048 shadow and the rect softbox.
+   * Desktop uses a 1024 shadow and a dimmer rect softbox.
    * Quest keeps the 512 map and leaves the softbox off.
    */
   setTier(tier: 'desktop' | 'quest'): void {
     const desktop = tier === 'desktop'
     this.key.intensity = desktop ? 1.55 : 1.15
-    this.key.shadow.mapSize.set(desktop ? 2048 : 512, desktop ? 2048 : 512)
+    this.key.shadow.mapSize.set(desktop ? 1024 : 512, desktop ? 1024 : 512)
     this.key.shadow.normalBias = desktop ? 0.012 : 0.01
     const span = desktop ? 0.7 : 0.6
     const camera = this.key.shadow.camera
@@ -118,7 +118,7 @@ export class HallLighting {
     camera.top = span
     camera.bottom = -span
     camera.updateProjectionMatrix()
-    this.rect.intensity = desktop ? 4 : 0
+    this.rect.intensity = desktop ? 2.2 : 0
   }
 
   /** Remove the lights from their parent. */

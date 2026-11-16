@@ -44,6 +44,11 @@ interface StudioLoader {
 interface StudioHooks {
   loader?: StudioLoader
   bake?: (renderer: WebGLRenderer, scene: Scene) => EnvBake
+  /**
+   * Desktop mirror and bloom. Default true.
+   * Automated browsers pass false so CI still runs tone mapping, lights, fog, orbit, and the HDR.
+   */
+  effects?: boolean
 }
 
 /**
@@ -62,7 +67,10 @@ export function configureHallStage(
   gl.toneMapping = ACESFilmicToneMapping
   gl.toneMappingExposure = quest ? 1 : 1.05
   gl.physicallyCorrectLights = true
+  capPixelRatio(gl, quest ? 1 : 1.5)
   hall.setTier(quest ? 'quest' : 'desktop')
+  const xr = gl.xr as { setFramebufferScaleFactor?: (value: number) => void; addEventListener?: (type: string, listener: () => void) => void } | undefined
+  if (quest) xr?.setFramebufferScaleFactor?.(0.95)
   if (!quest) {
     hall.frameDesktop()
     RectAreaLightUniformsLib.init()
@@ -79,16 +87,24 @@ export function configureHallStage(
     controls.rotateSpeed = 0.55
     controls.update()
     hall.orbit = controls
-    const reflector = createBoardReflector()
-    hall.board.object.add(reflector)
-    hall.reflector = reflector
-    const composer = new EffectComposer(gl)
-    composer.addPass(new RenderPass(scene, camera))
-    composer.addPass(new UnrealBloomPass(new Vector2(256, 256), 0.22, 0.35, 0.88))
-    hall.grade = composer
+    if (hooks?.effects !== false) {
+      const reflector = createBoardReflector()
+      hall.board.object.add(reflector)
+      hall.reflector = reflector
+      const composer = new EffectComposer(gl)
+      composer.addPass(new RenderPass(scene, camera))
+      composer.addPass(new UnrealBloomPass(new Vector2(1024, 1024), 0.15, 0.35, 0.92))
+      const css = new Vector2()
+      if (typeof gl.getSize === 'function') gl.getSize(css)
+      if (css.x > 0 && css.y > 0) composer.setSize(css.x, css.y)
+      hall.grade = composer
+    }
   }
-  loadStudioEnvironment(scene, gl, hooks)
-  const xr = gl.xr as { addEventListener?: (type: string, listener: () => void) => void } | undefined
+  if (quest) {
+    scene.environment = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
+  } else {
+    loadStudioEnvironment(scene, gl, hooks)
+  }
   xr?.addEventListener?.('sessionstart', () => {
     hall.setTier('quest')
     hall.grade = null
@@ -118,6 +134,11 @@ export function loadStudioEnvironment(scene: Scene, gl: WebGLRenderer, hooks?: S
       scene.environment = buildEnvironment(gl, darkHallEnvScene(), bake)
     },
   )
+}
+
+function capPixelRatio(gl: WebGLRenderer, cap: number): void {
+  if (typeof gl.getPixelRatio !== 'function' || typeof gl.setPixelRatio !== 'function') return
+  gl.setPixelRatio(Math.min(gl.getPixelRatio() || 1, cap))
 }
 
 function loadStudioHdr(

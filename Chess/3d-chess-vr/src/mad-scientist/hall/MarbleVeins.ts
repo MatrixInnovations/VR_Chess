@@ -53,8 +53,9 @@ float marbleVeinAmt(vec2 uv, vec2 tile) {
   p += vec2(hash11(seed), hash11(seed + 7.1)) * 0.35;
   float q = fbm(p * 2.4 + seed);
   vec2 w = p + 0.45 * vec2(q, fbm(p * 2.4 + 19.2));
-  float rid = 1.0 - abs(snoise(w * 3.2 + seed));
-  float vein = pow(smoothstep(0.82, 0.97, rid), 2.4);
+  float rid = 1.0 - abs(snoise(w * 4.8 + seed));
+  float vein = pow(smoothstep(0.72, 0.98, rid), 1.8);
+  vein += 0.45 * pow(smoothstep(0.80, 0.98, 1.0 - abs(snoise(w * 9.6))), 2.2);
   return vein;
 }
 vec3 srgbToLinear(vec3 c) { return pow(c, vec3(2.2)); }

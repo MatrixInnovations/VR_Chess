@@ -70,9 +70,37 @@ body {
   flex-wrap: wrap;
 }
 
+.hall-page h1,
+.hall-lead,
+.hall-meta {
+  background: var(--hud-bg-alpha);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+}
+
 .hall-meta,
 .hall-turn {
   color: var(--hud-status);
+}
+
+.hall-clock-active {
+  color: var(--hud-gold);
+  box-shadow: inset 0 -2px 0 var(--hud-gold);
+}
+
+.hall-clock-provisional {
+  color: var(--hud-gold-soft);
+}
+
+.hall-clock-flag {
+  color: var(--hud-text);
+  background: #8e2d2d;
+  border-radius: 4px;
+  padding: 0 0.35rem;
+}
+
+.hall-clock-low {
+  color: var(--hud-copper);
 }
 
 .hall-turn-black {

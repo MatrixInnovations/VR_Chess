@@ -58,14 +58,16 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
     <main className="hall-page">
       <h1>Chess Hall</h1>
       <p className="hall-lead">
-        Seated at a wooden board. Pass and play is ready. Lichess is in the menu.
+        Seated at a marble board. Pass and play is ready. Lichess is in the menu.
       </p>
       <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
-        <p data-testid="clock-white" data-active={clock.white.isActive}>
+        <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clock.white.expiry} className={clockFaceClass(clock.white)}>
           White {formatMs(clock.white.remainingMs)}
+          {clockNote(clock.white)}
         </p>
-        <p data-testid="clock-black" data-active={clock.black.isActive}>
+        <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clock.black.expiry} className={clockFaceClass(clock.black)}>
           Black {formatMs(clock.black.remainingMs)}
+          {clockNote(clock.black)}
         </p>
         <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
         <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
@@ -161,9 +163,12 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
               gl.shadowMap.type = PCFSoftShadowMap
             }
             const quest = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
-            const automated = typeof navigator !== 'undefined' && navigator.webdriver
-            if (state.scene && typeof gl.render === 'function' && !automated) {
-              configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest)
+            const forceEffects = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('effects')
+            const skipEffects = typeof navigator !== 'undefined' && navigator.webdriver && !forceEffects
+            if (state.scene && typeof gl.render === 'function') {
+              configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest, {
+                effects: !quest && !skipEffects,
+              })
             }
             model.attachPointer(state.gl.domElement as unknown as PointerSurface)
           }}
@@ -217,8 +222,10 @@ function HallTicker({ model }: { model: ChessApplication }): null {
       orbit.enabled = !grabbing
       orbit.update()
     }
-    model.runtime.hall.grade?.render()
-  })
+    const grade = model.runtime.hall.grade
+    if (grade) grade.render()
+    else if (typeof state.gl.render === 'function') state.gl.render(state.scene, state.camera)
+  }, 1)
   return null
 }
 
@@ -349,6 +356,22 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
  * @param ms - Remaining time from the read model.
  * @returns `m:ss`.
  */
+function clockFaceClass(face: { isActive: boolean; expiry: string; remainingMs: number }): string {
+  const names = ['hall-clock']
+  if (face.isActive) names.push('hall-clock-active')
+  if (face.expiry === 'provisional-expired') names.push('hall-clock-provisional')
+  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') names.push('hall-clock-flag')
+  if (face.expiry === 'running' && face.isActive && face.remainingMs <= 30_000) names.push('hall-clock-low')
+  return names.join(' ')
+}
+
+function clockNote(face: { isActive: boolean; expiry: string; remainingMs: number }): string {
+  if (face.expiry === 'provisional-expired') return ' · provisional'
+  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') return ' · flag'
+  if (face.expiry === 'running' && face.isActive && face.remainingMs <= 30_000) return ' · low'
+  return ''
+}
+
 function formatMs(ms: number): string {
   const whole = Math.max(0, Math.floor(ms / 1000))
   const minutes = Math.floor(whole / 60)
