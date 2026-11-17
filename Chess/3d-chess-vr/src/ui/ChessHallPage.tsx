@@ -65,8 +65,8 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
     }
     void model.completeRedirectIfPresent(window.location.href).finally(() => {
       stripAuthQuery()
-      window.setTimeout(stripAuthQuery, 0)
-      window.setTimeout(stripAuthQuery, 250)
+      const timer = window.setInterval(stripAuthQuery, 100)
+      window.setTimeout(() => window.clearInterval(timer), 2000)
     })
     return () => {
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
