@@ -62,12 +62,12 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         // Next may still be writing the first history entry. The interval tries again.
       }
     }
-    stripAuthQuery()
-    const timer = window.setInterval(stripAuthQuery, 50)
-    window.setTimeout(() => window.clearInterval(timer), 8000)
-    void model.completeRedirectIfPresent(window.location.href)
+    void model.completeRedirectIfPresent(window.location.href).finally(() => {
+      stripAuthQuery()
+      const timer = window.setInterval(stripAuthQuery, 100)
+      window.setTimeout(() => window.clearInterval(timer), 2000)
+    })
     return () => {
-      window.clearInterval(timer)
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
     }
   }, [model])
