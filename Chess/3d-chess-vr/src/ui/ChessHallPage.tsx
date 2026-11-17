@@ -52,7 +52,15 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
     if (window.sessionStorage.getItem('hall-intro-seen') !== '1') setShowIntro(true)
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
     if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
-    void model.completeRedirectIfPresent(window.location.href)
+    void model.completeRedirectIfPresent(window.location.href).finally(() => {
+      const loc = window.location
+      if (!loc.search.includes('error=') && !loc.search.includes('code=')) return
+      const clean = `${loc.pathname}${loc.hash}` || '/'
+      window.history.replaceState(null, '', clean)
+      void import('next/router')
+        .then(({ default: Router }) => Router.replace(clean, undefined, { shallow: true }))
+        .catch(() => undefined)
+    })
     return () => {
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
     }
