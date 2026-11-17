@@ -380,8 +380,8 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
       this.variant = event.variant;
       this.variantSupported = event.variant === 'standard' || event.variant === 'fromPosition';
       this.assignColor(event.whiteId, event.blackId);
-      if (event.white) this.whiteSeat = event.white;
-      if (event.black) this.blackSeat = event.black;
+      this.whiteSeat = event.white ?? null;
+      this.blackSeat = event.black ?? null;
       this.applyAuthoritative(event.state, true);
       return;
     }
@@ -468,20 +468,25 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
    * AI opponents are labeled and have no profile link. Null until a gameFull arrives.
    */
   opponentCard(): {
+    id: string;
     username: string;
     title: string | null;
     rating: number | null;
     ai: boolean;
+    aiLevel: number | null;
     ourColor: 'white' | 'black';
   } | null {
     if (this.ourColor !== 'white' && this.ourColor !== 'black') return null;
     const seat = this.ourColor === 'white' ? this.blackSeat : this.whiteSeat;
     if (!seat) return null;
+    if (seat.id && seat.id === this.accountId) return null;
     return {
+      id: seat.id,
       username: seat.name,
       title: seat.title,
       rating: seat.rating,
       ai: seat.ai,
+      aiLevel: seat.aiLevel ?? null,
       ourColor: this.ourColor,
     };
   }

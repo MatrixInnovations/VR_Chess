@@ -77,52 +77,67 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const error = model.shell.errorPresenter.snapshot()
   const snap = model.game.snapshot
   void revision
+  const [glPrefs] = useState(() => {
+    const questBrowser = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
+    const ratio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    return { dpr: questBrowser ? 1 : Math.min(ratio, 2), antialias: false }
+  })
   return (
     <main className="hall-page">
-      <h1 className="hall-title">Chess Hall</h1>
-      {showIntro ? (
-        <p className="hall-lead">
-          Seated at a marble board. Pass and play is ready. Lichess is in the menu.{' '}
-          <button
-            type="button"
-            onClick={() => {
-              window.sessionStorage.setItem('hall-intro-seen', '1')
-              setShowIntro(false)
-            }}
-          >
-            Dismiss
-          </button>
+      <div className="hall-column">
+        <h1 className="hall-title">Chess Hall</h1>
+        <p className="hall-meta">
+          {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} ·{' '}
+          <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn}</span> to move
+          {snap.outcome ? ` · ${snap.outcome.status}` : ''}
         </p>
-      ) : null}
-      <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
-        <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
-          White {formatClockMs(clock.white.remainingMs, clockBlank || !mounted)}
-          {clockNote({ ...clock.white, blank: clockBlank })}
-        </p>
-        <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clockBlank ? 'no-clock' : clock.black.expiry} className={clockFaceClass({ ...clock.black, blank: clockBlank })}>
-          Black {formatClockMs(clock.black.remainingMs, clockBlank || !mounted)}
-          {clockNote({ ...clock.black, blank: clockBlank })}
-        </p>
-        <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
-        <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
-        <p data-testid="presentation">{model.presentation}</p>
-        {model.message ? <p data-testid="status-line">{model.message}</p> : null}
-      </section>
-      {step ? (
-        <section className="hall-tour" aria-label="Tour">
-          <h2>{step.title}</h2>
-          <p>{step.body}</p>
-          <button type="button" onClick={() => model.tourNext()}>
-            Next
-          </button>
-          <button type="button" onClick={() => model.tourSkip()}>
-            Skip tour
-          </button>
+        <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
+          <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
+            White {formatClockMs(clock.white.remainingMs, clockBlank || !mounted)}
+            {clockNote({ ...clock.white, blank: clockBlank })}
+          </p>
+          <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clockBlank ? 'no-clock' : clock.black.expiry} className={clockFaceClass({ ...clock.black, blank: clockBlank })}>
+            Black {formatClockMs(clock.black.remainingMs, clockBlank || !mounted)}
+            {clockNote({ ...clock.black, blank: clockBlank })}
+          </p>
+          <p data-testid="clock-active" className="hall-sr">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
+          <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
+          <p data-testid="presentation" className="hall-sr">{model.presentation}</p>
+          {model.message ? <p data-testid="status-line">{model.message}</p> : null}
         </section>
-      ) : null}
+        {showIntro ? (
+          <p className="hall-lead">
+            Seated at a marble board. Pass and play is ready. Lichess is in the menu.{' '}
+            <button
+              type="button"
+              onClick={() => {
+                window.sessionStorage.setItem('hall-intro-seen', '1')
+                setShowIntro(false)
+              }}
+            >
+              Dismiss
+            </button>
+          </p>
+        ) : null}
+        {step ? (
+          <section className="hall-tour" aria-label="Tour">
+            <h2>{step.title}</h2>
+            <p>{step.body}</p>
+            <button type="button" onClick={() => model.tourNext()}>
+              Next
+            </button>
+            <button type="button" onClick={() => model.tourSkip()}>
+              Skip tour
+            </button>
+          </section>
+        ) : null}
+      </div>
       <LichessDock
         username={signIn.username}
         signedIn={signIn.phase === 'signed-in' && Boolean(signIn.username)}
+        redirecting={signIn.phase === 'redirecting'}
+        busy={model.seeking}
+        notice={signIn.phase === 'denied' ? signIn.message : lobby.message}
         opponent={model.opponentCard()}
         onSignIn={() => void model.beginSignIn()}
         onPlay={() => void model.playOnline()}
@@ -187,16 +202,11 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           </button>
         </div>
       ) : null}
-      <p className="hall-meta">
-        {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} ·{' '}
-        <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn}</span> to move
-        {snap.outcome ? ` · ${snap.outcome.status}` : ''}
-      </p>
       <div className="hall-stage">
         {mounted ? <Canvas
-          dpr={1}
+          dpr={glPrefs.dpr}
           shadows="percentage"
-          gl={{ preserveDrawingBuffer: keepDrawingBuffer(), antialias: false }}
+          gl={{ preserveDrawingBuffer: keepDrawingBuffer(), antialias: glPrefs.antialias }}
           camera={model.runtime.hall.camera}
           onCreated={(state: RootState) => {
             const gl = state.gl as WebGLRenderer

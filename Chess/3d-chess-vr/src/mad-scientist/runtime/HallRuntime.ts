@@ -78,9 +78,10 @@ export class HallRuntime {
    * Call once per rendered frame with the frame's timestamp.
    */
   frame(timestampMs: number): FrameReport {
+    const animating = this.animator.isAnimating() || this.grab.isGrabbing()
     this.animator.update(timestampMs)
     const moving = this.animator.isAnimating() || this.grab.isGrabbing()
-    if (moving || this.wasMoving) this.hall.syncDecals()
+    if (animating || moving || this.wasMoving) this.hall.syncDecals()
     this.wasMoving = moving
     return this.budget.sample(timestampMs)
   }

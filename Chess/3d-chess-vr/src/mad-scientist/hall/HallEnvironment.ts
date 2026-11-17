@@ -5,12 +5,9 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
-  CubeCamera,
   PMREMGenerator,
   Scene,
   Texture,
-  WebGLCubeRenderTarget,
-  sRGBEncoding,
   type WebGLRenderer,
 } from 'three'
 
@@ -23,7 +20,7 @@ export function darkHallEnvScene(): Scene {
   const scene = new Scene()
   const room = new Mesh(
     new BoxGeometry(10, 8, 10),
-    new MeshBasicMaterial({ color: 0x9aa0a8, side: BackSide }),
+    new MeshBasicMaterial({ color: 0xc4b2a0, side: BackSide }),
   )
   room.position.y = 2.2
   scene.add(room)
@@ -44,9 +41,9 @@ export function darkHallEnvScene(): Scene {
     light.lookAt(0, 1.1, 0)
     scene.add(light)
   }
-  panel(7.5, 5.2, [1, 0.98, 0.94], 28, 0, 4.6, 0.2)
-  panel(3.2, 2.2, [1, 0.92, 0.82], 14, 1.4, 2.6, 2.4)
-  panel(3.0, 1.2, [0.16, 0.15, 0.14], 1, 0, 0.2, -2.2)
+  panel(7.5, 5.2, [1, 0.94, 0.84], 18, 0, 4.6, 0.2)
+  panel(3.2, 2.2, [1, 0.82, 0.62], 8, 1.4, 2.6, 2.4)
+  panel(3.4, 1.4, [0.08, 0.07, 0.06], 1, 0, 0.15, -2.4)
   return scene
 }
 
@@ -69,13 +66,12 @@ export function buildEnvironment(
 }
 
 function bakePmrem(renderer: WebGLRenderer, envScene: Scene): { texture: Texture } {
-  const cube = new WebGLCubeRenderTarget(32, { encoding: sRGBEncoding })
-  const camera = new CubeCamera(0.1, 20, cube)
-  camera.position.set(0, 1.2, 0)
-  camera.update(renderer, envScene)
+  const previous = renderer.getRenderTarget()
+  renderer.setRenderTarget(previous)
+  renderer.clear()
   const pmrem = new PMREMGenerator(renderer)
-  const target = pmrem.fromCubemap(cube.texture)
+  const target = pmrem.fromScene(envScene, 0, 0.1, 20)
   pmrem.dispose()
-  cube.dispose()
+  renderer.setRenderTarget(previous)
   return target
 }

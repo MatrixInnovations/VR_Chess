@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Group, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial } from 'three'
+import { Group, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial } from 'three'
 
 import type { PieceKind } from '../contracts/types'
 import { BoardModel } from '../hall/BoardModel'
@@ -21,8 +21,7 @@ describe('PieceMaterialSet', () => {
     expect(white).not.toBe(black)
     expect(white.color.getHex()).not.toBe(black.color.getHex())
     expect((selected as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
-    expect((white as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0.05)
-    expect((white as MeshStandardMaterial).emissive.getHex()).toBe(0xb4b8c0)
+    expect((white as MeshStandardMaterial).emissiveIntensity).toBe(0)
     expect(dragging.transparent).toBe(true)
     expect(dragging.opacity).toBeLessThan(1)
   })
@@ -42,19 +41,22 @@ describe('PieceMaterialSet', () => {
     const marblePixel = (marble.map as { image: { data: Uint8Array } }).image.data
     expect(creamPixel[0]).toBeGreaterThan(180)
     expect(marblePixel[0]).toBeLessThan(80)
-    expect(cream).toBeInstanceOf(MeshBasicMaterial)
-    expect(marble).toBeInstanceOf(MeshBasicMaterial)
+    expect(cream).toBeInstanceOf(MeshPhysicalMaterial)
+    expect(marble).toBeInstanceOf(MeshPhysicalMaterial)
+    expect((cream as MeshPhysicalMaterial).clearcoat).toBe(0)
+    expect((cream as MeshPhysicalMaterial).roughness).toBeCloseTo(0.16)
+    expect((cream as MeshPhysicalMaterial).envMapIntensity).toBeCloseTo(0.4)
     expect(white).toBeInstanceOf(MeshStandardMaterial)
     expect(black).toBeInstanceOf(MeshStandardMaterial)
-    expect((white as MeshStandardMaterial).roughness).toBeCloseTo(0.18)
-    expect((white as MeshStandardMaterial).metalness).toBeCloseTo(0.78)
-    expect((black as MeshStandardMaterial).metalness).toBeCloseTo(0.8)
-    expect((white as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.05)
-    expect((black as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.15)
-    expect(white.color.getHex()).toBe(0xd4d7dc)
+    expect((white as MeshStandardMaterial).roughness).toBeCloseTo(0.15)
+    expect((white as MeshStandardMaterial).metalness).toBeCloseTo(1)
+    expect((black as MeshStandardMaterial).metalness).toBeCloseTo(0.92)
+    expect((white as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.35)
+    expect((black as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.65)
+    expect(white.color.getHex()).toBe(0xe4d6c8)
     expect(black.color.getHex()).toBe(0xc06a38)
     expect(set.get('black', 'selected')).toBeInstanceOf(MeshStandardMaterial)
-    expect((set.get('black', 'selected') as MeshStandardMaterial).metalness).toBeCloseTo(0.8)
+    expect((set.get('black', 'selected') as MeshStandardMaterial).metalness).toBeCloseTo(0.92)
     expect(set.gold().color.getHex()).toBe(0xc9a44c)
     expect(set.felt()).toBeInstanceOf(MeshLambertMaterial)
     const before = budget.textureCount

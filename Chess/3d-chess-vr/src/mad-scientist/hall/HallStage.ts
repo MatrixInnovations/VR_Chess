@@ -1,12 +1,7 @@
 import {
   ACESFilmicToneMapping,
-  BackSide,
   FogExp2,
-  Mesh,
-  MeshBasicMaterial,
   Scene,
-  SphereGeometry,
-  UVMapping,
   sRGBEncoding,
   Vector2,
   type Camera,
@@ -14,39 +9,26 @@ import {
   type WebGLRenderer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 
+import { createBoardReflector } from './BoardReflector'
 import { bakeMarbleGpu } from './MarbleVeins'
 import { buildEnvironment, darkHallEnvScene } from './HallEnvironment'
 import type { ChessHall } from './ChessHall'
-
-/** Same-origin CC0 studio HDR. See public/brown_photostudio_02_LICENSE.txt. */
-export const STUDIO_HDR_URL = '/brown_photostudio_02_1k.hdr'
 
 interface EnvBake {
   texture: Texture
 }
 
-interface StudioLoader {
-  load: (
-    url: string,
-    onLoad: (texture: Texture) => void,
-    onProgress?: (event: ProgressEvent) => void,
-    onError?: () => void,
-  ) => void
-}
-
 interface StudioHooks {
-  loader?: StudioLoader
   bake?: (renderer: WebGLRenderer, scene: Scene) => EnvBake
   /**
    * Desktop mirror and bloom. Default true.
-   * Automated browsers pass false so CI still runs tone mapping, lights, fog, orbit, and the HDR.
+   * Automated browsers pass false so CI still runs tone mapping, lights, fog, and orbit.
    */
   effects?: boolean
 }
@@ -65,7 +47,7 @@ export function configureHallStage(
 ): void {
   gl.outputEncoding = sRGBEncoding
   gl.toneMapping = ACESFilmicToneMapping
-  gl.toneMappingExposure = quest ? 0.9 : 0.88
+  gl.toneMappingExposure = quest ? 1 : 1.05
   gl.physicallyCorrectLights = true
   hall.setTier(quest ? 'quest' : 'desktop')
   const xr = gl.xr as { addEventListener?: (type: string, listener: () => void) => void } | undefined
@@ -84,6 +66,10 @@ export function configureHallStage(
     controls.rotateSpeed = 0.55
     controls.update()
     hall.orbit = controls
+    const reflector = createBoardReflector()
+    hall.root.add(reflector)
+    hall.reflector = reflector
+    hall.materials.setMirrorBlend(true)
     if (hooks?.effects !== false) {
       const composer = new EffectComposer(gl)
       composer.addPass(new RenderPass(scene, camera))
@@ -101,15 +87,17 @@ export function configureHallStage(
       hall.grade = composer
     }
   }
+  const bindStudio = () => {
+    hall.materials.bindReflections(buildEnvironment(gl, darkHallEnvScene(), hooks?.bake))
+  }
   bakeMarbleGpu(gl, hall.materials, quest)
+  bindStudio()
   const canvas = gl.domElement as { addEventListener?: (type: string, listener: () => void) => void } | undefined
   canvas?.addEventListener?.('webglcontextrestored', () => {
     bakeMarbleGpu(gl, hall.materials, quest)
+    bindStudio()
   })
-  const starter = buildEnvironment(gl, darkHallEnvScene(), hooks?.bake)
-  hall.materials.bindReflections(starter)
   if (typeof gl.compile === 'function') gl.compile(scene, camera)
-  if (!quest && hooks?.loader) loadStudioEnvironment(scene, gl, hall, hooks)
   const desktopGrade = hall.grade
   const desktopFog = scene.fog
   xr?.addEventListener?.('sessionstart', () => {
@@ -118,6 +106,8 @@ export function configureHallStage(
     scene.fog = null
     if (hall.orbit) hall.orbit.enabled = false
     if (hall.reflector) hall.reflector.visible = false
+    const clock = hall.root.getObjectByName('physical-chess-clock')
+    if (clock) clock.visible = true
   })
   xr?.addEventListener?.('sessionend', () => {
     if (quest) return
@@ -127,36 +117,7 @@ export function configureHallStage(
     scene.fog = desktopFog
     if (hall.orbit) hall.orbit.enabled = true
     if (hall.reflector) hall.reflector.visible = true
+    const clock = hall.root.getObjectByName('physical-chess-clock')
+    if (clock) clock.visible = false
   })
-}
-
-/** Load the self-hosted studio HDR. A failed read falls back to the softbox scene. */
-export function loadStudioEnvironment(_scene: Scene, gl: WebGLRenderer, hall: ChessHall, hooks?: StudioHooks): void {
-  const loader = hooks?.loader ?? { load: loadStudioHdr }
-  const bake = hooks?.bake
-  loader.load(
-    STUDIO_HDR_URL,
-    (hdr) => {
-      hdr.mapping = UVMapping
-      const room = new Scene()
-      const sphere = new Mesh(new SphereGeometry(8, 32, 16), new MeshBasicMaterial({ map: hdr, color: 0xffffff, side: BackSide }))
-      sphere.rotation.y = 0.35
-      room.add(sphere)
-      hall.materials.bindReflections(buildEnvironment(gl, room, bake))
-      hdr.dispose()
-    },
-    undefined,
-    () => {
-      hall.materials.bindReflections(buildEnvironment(gl, darkHallEnvScene(), bake))
-    },
-  )
-}
-
-function loadStudioHdr(
-  url: string,
-  onLoad: (texture: Texture) => void,
-  onProgress?: (event: ProgressEvent) => void,
-  onError?: () => void,
-): void {
-  new RGBELoader().load(url, (texture) => onLoad(texture), onProgress, () => onError?.())
 }

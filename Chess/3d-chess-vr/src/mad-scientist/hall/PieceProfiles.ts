@@ -13,8 +13,8 @@ export const PIECE_HEIGHT_M = {
   pawn: 0.0425,
 } as const
 
-/** 12 segments keeps the lathe smooth at seated distance and about half the triangles. */
-export const LATHE_SEGMENTS = 12
+/** Desktop lathe. Quest shares the cache so a piece does not rebuild when the tier changes. */
+export const LATHE_SEGMENTS = 24
 
 const v = (pts: ReadonlyArray<readonly [number, number]>) => pts.map(([x, y]) => new Vector2(x, y))
 

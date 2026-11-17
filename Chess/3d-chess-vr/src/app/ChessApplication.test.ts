@@ -208,6 +208,7 @@ describe('ChessApplication pass and play', () => {
     expect(hall.presentation).toBe('immersive')
     await hall.toggleImmersive()
     expect(hall.presentation).not.toBe('immersive')
+    expect(hall.runtime.hall.root.getObjectByName('physical-chess-clock')?.visible).toBe(false)
     await hall.enterPassthrough()
     expect(hall.message).toMatch(/no ar/)
     xr.ar = true
@@ -215,10 +216,29 @@ describe('ChessApplication pass and play', () => {
     expect(hall.message).toMatch(/Passthrough/)
     await hall.completeRedirectIfPresent('not a url')
     await hall.completeRedirectIfPresent('https://play.example/hall?code=abc&state=xyz')
+    expect(hall.runtime.hall.root.getObjectByName('physical-chess-clock')?.visible).toBe(true)
     hall.tourNext()
     hall.tourSkip()
     hall.toggleMenu()
     hall.toggleMenu()
+  })
+
+  it('shows a cancelled Lichess redirect in the sign-in message and keeps the button path', async () => {
+    const hall = new ChessApplication({
+      xr: new FakeXr(),
+      clientId: 'vr-chess-hall',
+      redirectUri: 'https://play.example/',
+      whiteMs: 60_000,
+      blackMs: 60_000,
+      incrementMs: 0,
+      transport: new DeadTransport(),
+      storage: new MemoryKeyValueStore(),
+    })
+    await hall.completeRedirectIfPresent('https://play.example/?error=access_denied&state=abc')
+    expect(hall.shell.authPresenter.snapshot().message).toBe(
+      'Lichess sign-in was cancelled. You can try again anytime.',
+    )
+    expect(hall.shell.authPresenter.snapshot().phase).toBe('denied')
   })
 })
 

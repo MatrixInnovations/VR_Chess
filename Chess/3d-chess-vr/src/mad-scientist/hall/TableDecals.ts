@@ -14,12 +14,12 @@ import type { PieceMaterialSet } from './PieceMaterialSet'
 import type { PieceModel } from './PieceModel'
 
 const DIAMETER: Record<PieceKind, number> = {
-  king: 0.03,
-  queen: 0.028,
-  bishop: 0.026,
-  knight: 0.026,
-  rook: 0.026,
-  pawn: 0.022,
+  king: 0.04,
+  queen: 0.038,
+  bishop: 0.036,
+  knight: 0.036,
+  rook: 0.036,
+  pawn: 0.03,
 }
 
 /**

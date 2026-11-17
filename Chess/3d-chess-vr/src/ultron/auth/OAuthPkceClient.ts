@@ -119,8 +119,6 @@ export class OAuthPkceClient implements ITokenSource {
    * @param callback - Absolute redirect URL including the query string.
    */
   async completeAuthorization(callback: string): Promise<TokenExchangeResult> {
-    const transaction = this.readTransaction();
-    if (!transaction) return this.fail('transaction-missing', 'No authorization is in progress');
     let url: URL;
     try {
       url = new URL(callback);
@@ -128,14 +126,16 @@ export class OAuthPkceClient implements ITokenSource {
       this.store.delete(TRANSACTION_KEY);
       return this.fail('authorization-failed', 'Callback URL was not absolute');
     }
+    const transaction = this.readTransaction();
     this.store.delete(TRANSACTION_KEY);
+    const error = url.searchParams.get('error');
+    if (error === 'access_denied') return this.fail('authorization-denied', 'The user denied authorization');
+    if (error) return this.fail('authorization-failed', 'Authorization failed');
+    if (!transaction) return this.fail('transaction-missing', 'No authorization is in progress');
     const expected = new URL(transaction.redirectUri);
     if (url.origin !== expected.origin || url.pathname !== expected.pathname) {
       return this.fail('redirect-mismatch', 'Callback did not match the stored redirect URI');
     }
-    const error = url.searchParams.get('error');
-    if (error === 'access_denied') return this.fail('authorization-denied', 'The user denied authorization');
-    if (error) return this.fail('authorization-failed', 'Authorization failed');
     const state = url.searchParams.get('state');
     if (!state) return this.fail('state-missing', 'Callback did not include state');
     if (state !== transaction.state) return this.fail('state-mismatch', 'OAuth state did not match');

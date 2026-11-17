@@ -89,7 +89,11 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
   async completeLogin(callbackUrl: string): Promise<{ username: string }> {
     const oauth = this.ensureOauth()
     const exchanged = await oauth.completeAuthorization(callbackUrl)
-    if (!exchanged.ok) throw new Error(exchanged.message)
+    if (!exchanged.ok) {
+      const failure = new Error(exchanged.message) as Error & { code?: string }
+      failure.code = exchanged.reason === 'authorization-denied' ? 'access_denied' : exchanged.reason
+      throw failure
+    }
     const accessToken = oauth.getAccessToken()
     if (!accessToken) throw new Error('Sign-in finished without a token')
     const account = await this.client.getAccount(accessToken, new AbortController().signal)

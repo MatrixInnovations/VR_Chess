@@ -172,14 +172,18 @@ export class BoardEventParser {
     const record = value as Record<string, unknown>;
     const id = this.stringField(record.id);
     if (!id) return null;
-    const ai = typeof record.aiLevel === 'number';
-    const name = ai ? 'Lichess AI' : this.stringField(record.name) ?? this.stringField(record.username) ?? id;
+    const aiLevel = typeof record.aiLevel === 'number' ? record.aiLevel : null;
+    const ai = aiLevel !== null;
+    const name = ai
+      ? `Stockfish level ${aiLevel}`
+      : this.stringField(record.name) ?? this.stringField(record.username) ?? id;
     return {
       id,
       name,
       title: this.stringField(record.title),
       rating: typeof record.rating === 'number' ? record.rating : null,
       ai,
+      aiLevel,
     };
   }
 

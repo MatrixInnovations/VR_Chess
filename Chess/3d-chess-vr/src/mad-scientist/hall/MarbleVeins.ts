@@ -87,12 +87,14 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix, float lift) {
   float vein = marbleVeinAmt(uv, tile);
   vec3 color;
   if (dark > 0.5) {
-    vec3 base = mix(srgbToLinear(vec3(0.18, 0.17, 0.16)), srgbToLinear(vec3(0.26, 0.24, 0.22)), lift);
-    vec3 veinC = srgbToLinear(vec3(0.55, 0.46, 0.30));
+    vec3 base = mix(srgbToLinear(vec3(0.14, 0.13, 0.12)), srgbToLinear(vec3(0.20, 0.18, 0.16)), lift);
+    vec3 veinC = srgbToLinear(vec3(0.55, 0.44, 0.24));
     color = mix(base, veinC, clamp(vein * veinMix, 0.0, 1.0));
   } else {
     vec3 base = mix(srgbToLinear(vec3(0.941, 0.922, 0.890)), srgbToLinear(vec3(0.886, 0.867, 0.839)), body * 0.06);
-    color = mix(base, srgbToLinear(vec3(0.620, 0.600, 0.580)), clamp(vein, 0.0, 1.0));
+    float rim = smoothstep(0.36, 0.5, max(abs(uv.x - 0.5), abs(uv.y - 0.5)));
+    base = mix(base, base * vec3(0.62, 0.58, 0.52), rim);
+    color = mix(base, srgbToLinear(vec3(0.55, 0.50, 0.44)), clamp(vein, 0.0, 1.0));
   }
   return color;
 }
@@ -104,15 +106,16 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix, float lift) {
  * The live materials then sample those textures instead of running the noise per pixel,
  * and the page does not spend tens of seconds baking them on the CPU.
  */
-export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _quest: boolean): void {
+export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, quest: boolean): void {
   if (typeof gl.setRenderTarget !== 'function' || typeof gl.render !== 'function') return
-  const size = 512
+  const size = quest ? 512 : 2048
+  const anisotropy = 1
   const started = typeof performance !== 'undefined' ? performance.now() : 0
-  const light = renderMarble(gl, size, 8, false, 1)
-  const dark = renderMarble(gl, size, 8, true, 0.85)
-  const frame = renderMarble(gl, size, 1, true, 0.1)
-  const floor = renderMarble(gl, size, 1, true, 0.16, 0.45)
-  const wall = renderMarble(gl, size, 1, true, 0.08, 0.28)
+  const light = renderMarble(gl, size, 8, false, 1, 0, anisotropy)
+  const dark = renderMarble(gl, size, 8, true, 0.55, 0.15, anisotropy)
+  const frame = renderMarble(gl, size, 1, true, 0.12, 0.1, anisotropy)
+  const floor = renderMarble(gl, size, 1, true, 0.12, 0.18, anisotropy)
+  const wall = renderMarble(gl, size, 1, true, 0.08, 0.12, anisotropy)
   floor.texture.repeat.set(4, 4)
   wall.texture.repeat.set(1.5, 1.5)
   materials.installBakedMarble({
@@ -130,13 +133,21 @@ export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _q
   }
 }
 
-function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: boolean, veinMix: number, lift = 0): WebGLRenderTarget {
+function renderMarble(
+  gl: WebGLRenderer,
+  size: number,
+  cells: number,
+  dark: boolean,
+  veinMix: number,
+  lift = 0,
+  anisotropy = 1,
+): WebGLRenderTarget {
   const mipmaps = size > 0 && (size & (size - 1)) === 0
   const target = new WebGLRenderTarget(size, size, {
     magFilter: LinearFilter,
     minFilter: mipmaps ? LinearMipmapLinearFilter : LinearFilter,
     generateMipmaps: mipmaps,
-    anisotropy: 1,
+    anisotropy,
     wrapS: RepeatWrapping,
     wrapT: RepeatWrapping,
     encoding: sRGBEncoding,
@@ -179,6 +190,7 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
   scene.add(new Mesh(geometry, material))
   const previousTarget = gl.getRenderTarget()
   gl.setRenderTarget(target)
+  if (typeof gl.clear === 'function') gl.clear()
   gl.render(scene, camera)
   gl.setRenderTarget(previousTarget)
   geometry.dispose()

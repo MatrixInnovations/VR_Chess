@@ -6,7 +6,7 @@ import { ChessHall } from '../hall/ChessHall'
 import { configureHallStage } from '../hall/HallStage'
 
 import type { PieceKind } from '../contracts/types'
-import { createBoardReflector } from '../hall/BoardReflector'
+import { createBoardReflector, REFLECTOR_RESOLUTION } from '../hall/BoardReflector'
 import { buildEnvironment, darkHallEnvScene } from '../hall/HallEnvironment'
 import { KING_HEIGHT_M } from '../hall/metrics'
 import { coordinateBorderTexture, coordinateImage, paintCoordinateGlyphs } from '../hall/MarbleTexture'
@@ -247,17 +247,14 @@ describe('hall stage', () => {
     } as unknown as WebGLRenderer
     const environment = new Texture()
     configureHallStage(gl, scene, hall.camera, hall, false, {
-      loader: {
-        load(_url, _onLoad, _progress, onError) {
-          onError?.()
-        },
-      },
       bake: () => ({ texture: environment }),
     })
     expect(hall.camera.fov).toBe(40)
     expect(hall.camera.position.y).toBeCloseTo(1.1)
     expect(hall.camera.position.z).toBeCloseTo(0.6)
-    expect(hall.reflector).toBeNull()
+    expect(hall.reflector).toBeTruthy()
+    expect(hall.materials.boardSquare('light').opacity).toBeCloseTo(0.82)
+    expect(hall.materials.boardSquare('dark').opacity).toBeCloseTo(0.7)
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]
     expect(bloom.strength).toBeCloseTo(0.15)
@@ -266,7 +263,8 @@ describe('hall stage', () => {
     expect(scene.fog).toBeTruthy()
     expect(scene.environment).toBeNull()
     expect(hall.materials.get('white', 'idle').envMap).toBe(environment)
-    expect(hall.materials.boardSquare('light').envMap).toBeNull()
+    expect(hall.materials.boardSquare('light').envMap).toBe(environment)
+    expect(hall.materials.boardSquare('dark').envMap).toBe(environment)
     expect((gl as unknown as { compile: ReturnType<typeof vi.fn> }).compile).toHaveBeenCalledTimes(1)
     listeners.sessionstart()
     expect(hall.orbit?.enabled).toBe(false)
@@ -278,14 +276,9 @@ describe('hall stage', () => {
     hall.dispose()
   })
 
-  it('bakes a same-origin studio hdr and skips the reflector on Quest', () => {
+  it('bakes the studio scene and skips the reflector on Quest', () => {
     const hall = new ChessHall()
     const scene = new Scene()
-    const hdr = new Texture()
-    let disposed = false
-    hdr.dispose = () => {
-      disposed = true
-    }
     const environment = new Texture()
     const listeners: Record<string, () => void> = {}
     configureHallStage({
@@ -295,14 +288,8 @@ describe('hall stage', () => {
         },
       },
     } as unknown as WebGLRenderer, scene, hall.camera, hall, true, {
-      loader: {
-        load(_url, onLoad) {
-          onLoad?.(hdr)
-        },
-      },
       bake: () => ({ texture: environment }),
     })
-    expect(disposed).toBe(false)
     expect(scene.environment).toBeNull()
     expect(hall.materials.get('black', 'idle').envMap).toBe(environment)
     expect(hall.reflector).toBeNull()
@@ -343,14 +330,11 @@ describe('desktop stage without the mirror', () => {
     const environment = new Texture()
     configureHallStage(gl, scene, hall.camera, hall, false, {
       effects: false,
-      loader: {
-        load(_url, _onLoad, _progress, onError) {
-          onError?.()
-        },
-      },
       bake: () => ({ texture: environment }),
     })
-    expect(hall.reflector).toBeNull()
+    expect(hall.reflector).toBeTruthy()
+    expect(hall.materials.boardSquare('light').opacity).toBeCloseTo(0.82)
+    expect(hall.materials.boardSquare('dark').opacity).toBeCloseTo(0.7)
     expect(hall.grade).toBeNull()
     expect(hall.camera.fov).toBe(40)
     expect(hall.orbit).toBeTruthy()
@@ -366,6 +350,7 @@ describe('desktop stage without the mirror', () => {
 describe('board reflector', () => {
   it('covers the playing surface and sits just under the squares', () => {
     const reflector = createBoardReflector()
+    expect(REFLECTOR_RESOLUTION).toBe(256)
     expect(reflector.name).toBe('board-reflector')
     expect(reflector.position.y).toBeLessThan(0.752)
     reflector.geometry.dispose()

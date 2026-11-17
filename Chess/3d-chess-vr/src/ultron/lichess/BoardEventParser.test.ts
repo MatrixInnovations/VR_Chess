@@ -49,7 +49,8 @@ describe('BoardEventParser', () => {
     expect(ai.event.white?.title).toBe('FM');
     expect(ai.event.white?.rating).toBe(1800);
     expect(ai.event.black?.ai).toBe(true);
-    expect(ai.event.black?.name).toBe('Lichess AI');
+    expect(ai.event.black?.name).toBe('Stockfish level 6');
+    expect(ai.event.black?.aiLevel).toBe(6);
   });
 
   it('parses gameState, gameStart, and challenge events', () => {

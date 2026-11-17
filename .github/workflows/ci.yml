@@ -17,6 +17,8 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: Chess/3d-chess-vr/package-lock.json
+      - name: Pin npm
+        run: npm install -g npm@10.9.2
       - name: Install
         run: npm ci
       - name: Typecheck
@@ -31,4 +33,4 @@ jobs:
       - name: Build
         run: npm run build
       - name: Browser smoke
-        run: npx playwright install --with-deps chromium && npx playwright test -c playwright.prod.config.ts && npx playwright test
+        run: npx playwright install --with-deps chromium && npx playwright test -c playwright.prod.config.ts && npx playwright test -c playwright.shipped.config.ts && npx playwright test

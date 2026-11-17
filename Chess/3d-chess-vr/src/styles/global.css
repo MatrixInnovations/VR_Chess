@@ -42,6 +42,19 @@ body {
   border: 0;
 }
 
+.hall-column {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.9rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  max-width: 22rem;
+  margin: 0;
+}
+
 .hall-page h1,
 .hall-lead,
 .hall-hud,
@@ -54,9 +67,15 @@ body {
   margin: 0;
 }
 
+.hall-column .hall-title,
+.hall-column .hall-meta,
+.hall-column .hall-hud,
+.hall-column .hall-lead,
+.hall-column .hall-tour {
+  position: static;
+}
+
 .hall-title {
-  top: 0.7rem;
-  left: 0.9rem;
   font-size: 0.95rem;
   font-weight: 500;
   background: rgba(14, 14, 16, 0.55);
@@ -66,8 +85,6 @@ body {
 }
 
 .hall-meta {
-  top: 2.35rem;
-  left: 0.9rem;
   background: rgba(14, 14, 16, 0.55);
   border: none;
   padding: 0.15rem 0.45rem;
@@ -77,18 +94,14 @@ body {
 }
 
 .hall-hud {
-  top: 4.2rem;
-  left: 0.9rem;
   background: transparent;
   border: none;
   padding: 0;
-  max-width: 11rem;
-  font-size: 0.82rem;
+  max-width: 16rem;
+  font-size: 0.95rem;
 }
 
 .hall-lead {
-  top: 6.2rem;
-  left: 0.9rem;
   max-width: 22rem;
   font-size: 0.85rem;
 }
@@ -152,11 +165,20 @@ body {
 }
 
 .hall-clock-flag {
-  color: #f3efe6;
+  color: #fff7f5;
   background: #1a0505;
   border-radius: 4px;
-  padding: 0 0.35rem;
-  box-shadow: inset 0 0 0 2px #ff4d4d;
+  padding: 0.05rem 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 2px #ffd0cc;
+}
+
+.hall-clock-flag-offline {
+  color: #2a0906;
+  background: #f2c2a0;
+  box-shadow: inset 0 0 0 2px #2a0906;
 }
 
 .hall-clock-low {

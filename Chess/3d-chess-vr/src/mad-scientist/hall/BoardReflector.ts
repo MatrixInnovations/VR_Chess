@@ -7,8 +7,8 @@ import { BOARD_SURFACE_Y } from './metrics'
  * Desktop mirror of the pieces in the 8×8.
  * XR must hide this mesh. It is an extra render pass.
  */
-/** Half of a 1024 map. The beauty pass stays sharper than this mirror. */
-export const REFLECTOR_RESOLUTION = 512
+/** 256 matches a 512 mirror from the seated camera and stays inside the frame budget. */
+export const REFLECTOR_RESOLUTION = 256
 
 export function createBoardReflector(): Reflector {
   const reflector = new Reflector(new PlaneGeometry(0.4, 0.4), {

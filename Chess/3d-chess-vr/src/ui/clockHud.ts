@@ -28,7 +28,8 @@ export function clockFaceClass(face: ClockHudFace): string {
   if (face.blank || face.expiry === 'no-clock') return names.join(' ')
   if (face.isActive) names.push('hall-clock-active')
   if (face.expiry === 'provisional-expired') names.push('hall-clock-provisional')
-  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') names.push('hall-clock-flag')
+  if (face.expiry === 'confirmed-flag') names.push('hall-clock-flag')
+  if (face.expiry === 'offline-local-flag') names.push('hall-clock-flag', 'hall-clock-flag-offline')
   if (clockIsLow(face)) names.push('hall-clock-low')
   return names.join(' ')
 }
@@ -37,7 +38,7 @@ export function clockFaceClass(face: ClockHudFace): string {
 export function clockNote(face: ClockHudFace): string {
   if (face.blank || face.expiry === 'no-clock') return ''
   if (face.expiry === 'provisional-expired') return ' · provisional'
-  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') return ' · flag'
+  if (face.expiry === 'confirmed-flag' || face.expiry === 'offline-local-flag') return ' · FLAG'
   if (clockIsLow(face)) return ' · low'
   return ''
 }

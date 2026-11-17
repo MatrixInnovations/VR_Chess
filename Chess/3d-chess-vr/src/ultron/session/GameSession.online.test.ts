@@ -537,6 +537,63 @@ describe('online GameSession', () => {
     expect(received.every((line) => line.generation === 1)).toBe(true);
     expect(syncs).toBe(0);
   });
+
+  it('replaces the opponent seat between games and never shows our own name', () => {
+    const player = new FakeOnlinePlayer();
+    const session = online(player);
+    player.inbox?.onAccount('Ada', 'ada');
+    player.inbox?.onIncoming({ type: 'gameStart', gameId: 'g1', color: 'white', compatBoard: true });
+    player.inbox?.onBoardEvent({
+      type: 'gameFull',
+      id: 'g1',
+      initialFen: 'startpos',
+      variant: 'standard',
+      whiteId: 'ada',
+      blackId: 'salma',
+      white: { id: 'ada', name: 'Ada', title: null, rating: 1500, ai: false },
+      black: { id: 'salma', name: 'Salma', title: 'FM', rating: 2100, ai: false },
+      state: {
+        moves: [],
+        wtime: 600000,
+        btime: 600000,
+        winc: 0,
+        binc: 0,
+        status: 'started',
+        winner: null,
+        wdraw: false,
+        bdraw: false,
+      },
+    });
+    expect(session.opponentCard()?.username).toBe('Salma');
+    expect(session.opponentCard()?.id).toBe('salma');
+    expect(session.opponentCard()?.username).not.toBe('Ada');
+    player.inbox?.onBoardEvent({
+      type: 'gameFull',
+      id: 'g2',
+      initialFen: 'startpos',
+      variant: 'standard',
+      whiteId: 'ada',
+      blackId: 'stockfish',
+      white: { id: 'ada', name: 'Ada', title: null, rating: 1500, ai: false },
+      black: { id: 'stockfish', name: 'Stockfish level 3', title: null, rating: null, ai: true, aiLevel: 3 },
+      state: {
+        moves: [],
+        wtime: 600000,
+        btime: 600000,
+        winc: 0,
+        binc: 0,
+        status: 'started',
+        winner: null,
+        wdraw: false,
+        bdraw: false,
+      },
+    });
+    const card = session.opponentCard();
+    expect(card?.ai).toBe(true);
+    expect(card?.aiLevel).toBe(3);
+    expect(card?.username).toBe('Stockfish level 3');
+    expect(card?.username).not.toBe('Ada');
+  });
 });
 
 class RecordingClock implements IClockPort {

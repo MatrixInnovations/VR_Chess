@@ -48,3 +48,14 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await expectProbePainted(page)
   await expectPiecesShaded(page)
 })
+
+test('dismiss is clickable and a cancelled Lichess sign-in stays on screen', async ({ page }) => {
+  await page.goto('/?error=access_denied&state=cancelled')
+  const dismissed = page.getByRole('button', { name: 'Dismiss' })
+  await expect(dismissed).toBeVisible()
+  await dismissed.click()
+  await expect(dismissed).toHaveCount(0)
+  await expect(page.getByText('Lichess sign-in was cancelled. You can try again anytime.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in with Lichess' })).toBeEnabled()
+  await expect(page).not.toHaveURL(/error=/)
+})

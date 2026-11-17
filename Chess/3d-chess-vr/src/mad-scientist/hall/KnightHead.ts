@@ -41,7 +41,6 @@ export function buildKnightHead(): BufferGeometry {
     bevelSegments: 4,
   })
   geometry.translate(0, 0, -0.014)
-  shapeKnight(geometry)
   const head = geometry.toNonIndexed()
   geometry.dispose()
   const parts = [
@@ -56,37 +55,7 @@ export function buildKnightHead(): BufferGeometry {
   for (const part of parts) part.dispose()
   if (!merged) throw new Error('knight head merge failed')
   merged.computeVertexNormals()
-  faceOutward(merged)
   return merged
-}
-
-/** Point the horse's surface normals out from its own center, the same way a lathe does. */
-function faceOutward(geometry: BufferGeometry): void {
-  const position = geometry.getAttribute('position')
-  const normal = geometry.getAttribute('normal')
-  let cx = 0
-  let cy = 0
-  let cz = 0
-  for (let index = 0; index < position.count; index += 1) {
-    cx += position.getX(index)
-    cy += position.getY(index)
-    cz += position.getZ(index)
-  }
-  const count = position.count || 1
-  cx /= count
-  cy /= count
-  cz /= count
-  for (let index = 0; index < normal.count; index += 1) {
-    const dx = position.getX(index) - cx
-    const dy = position.getY(index) - cy
-    const dz = position.getZ(index) - cz
-    const x = normal.getX(index)
-    const y = normal.getY(index)
-    const z = normal.getZ(index)
-    if (x * dx + y * dy + z * dz >= 0) continue
-    normal.setXYZ(index, -x, -y, -z)
-  }
-  normal.needsUpdate = true
 }
 
 function place(
@@ -107,21 +76,3 @@ function place(
   return flat
 }
 
-function shapeKnight(geometry: ExtrudeGeometry): void {
-  const position = geometry.getAttribute('position')
-  const half = 0.018
-  for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index)
-    const y = position.getY(index)
-    const z = position.getZ(index)
-    const muzzle = Math.max(0, (x - 0.004) / 0.012)
-    const cheek = Math.exp(-((x - 0.0) ** 2 + (y - 0.042) ** 2) / 5e-5)
-    const neck = y < 0.032 ? 1.18 : 1
-    const nz = Math.min(1, Math.abs(z) / half)
-    const round = Math.sqrt(Math.max(0.22, 1 - nz * nz))
-    const thickness = half * round * (1 - 0.4 * muzzle) * (1 + 0.3 * cheek) * neck
-    position.setZ(index, Math.sign(z) * thickness)
-  }
-  position.needsUpdate = true
-  geometry.computeVertexNormals()
-}

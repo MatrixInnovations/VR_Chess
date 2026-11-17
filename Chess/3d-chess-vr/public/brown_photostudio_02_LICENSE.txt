@@ -1,6 +1,0 @@
-Poly Haven — brown_photostudio_02 (1k HDR)
-License: CC0 1.0 Universal
-Source: https://polyhaven.com/a/brown_photostudio_02
-File: https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/brown_photostudio_02_1k.hdr
-Hosted at /brown_photostudio_02_1k.hdr so the page never fetches a remote HDR (production CSP connect-src 'self').
-The 1k file is 1,648,130 bytes.

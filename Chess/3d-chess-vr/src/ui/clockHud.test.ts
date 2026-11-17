@@ -29,8 +29,9 @@ describe('clock HUD cues', () => {
     expect(clockFaceClass(provisional)).toBe('hall-clock hall-clock-provisional')
     expect(clockNote(provisional)).toBe(' · provisional')
     expect(clockFaceClass(flagged)).toBe('hall-clock hall-clock-flag')
-    expect(clockNote(flagged)).toBe(' · flag')
-    expect(clockNote(face({ expiry: 'offline-local-flag' }))).toBe(' · flag')
+    expect(clockNote(flagged)).toBe(' · FLAG')
+    expect(clockNote(face({ expiry: 'offline-local-flag' }))).toBe(' · FLAG')
+    expect(clockFaceClass(face({ expiry: 'offline-local-flag' }))).toContain('hall-clock-flag-offline')
     expect(clockFaceClass(provisional)).not.toBe(clockFaceClass(flagged))
   })
 

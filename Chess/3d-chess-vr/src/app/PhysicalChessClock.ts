@@ -150,14 +150,15 @@ export class PhysicalChessClock {
     context.fillStyle = ink.background
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
     if (expiry === 'confirmed-flag' || expiry === 'offline-local-flag') {
-      context.strokeStyle = '#ff4d4d'
+      const offline = expiry === 'offline-local-flag'
+      context.strokeStyle = offline ? '#2a0906' : '#ffd0cc'
       context.lineWidth = 8
       context.strokeRect(12, 12, paint.canvas.width - 24, paint.canvas.height - 24)
-      context.fillStyle = '#ff4d4d'
-      context.font = 'bold 18px Georgia, serif'
+      context.fillStyle = offline ? '#2a0906' : '#ffe8e4'
+      context.font = '700 36px Georgia, serif'
       context.textAlign = 'center'
       context.textBaseline = 'middle'
-      context.fillText('FLAG', paint.canvas.width / 2, 22)
+      context.fillText('FLAG', paint.canvas.width / 2, 28)
     }
     context.fillStyle = low ? '#ffd8b0' : ink.digit
     context.font = 'bold 64px Georgia, serif'

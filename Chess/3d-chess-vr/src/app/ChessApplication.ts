@@ -433,6 +433,7 @@ export class ChessApplication {
         this.modes.switchTo('desktop3d')
         this.host.setView('seated')
         this.hud.setViewMode('desktop3d')
+        this.syncTableClock(false)
         this.message = this.xr.lastError
         this.bump()
         return
@@ -440,6 +441,7 @@ export class ChessApplication {
       this.host.setView('immersive')
       this.hud.setViewMode('immersive')
       this.shell.navigator.switchInGameView('immersive')
+      this.syncTableClock(true)
       this.message = ''
     } else {
       await this.xr.exit()
@@ -447,6 +449,7 @@ export class ChessApplication {
       this.host.setView('seated')
       this.hud.setViewMode('desktop3d')
       this.shell.navigator.switchInGameView('desktop3d')
+      this.syncTableClock(false)
       this.message = ''
     }
     this.bump()
@@ -468,6 +471,7 @@ export class ChessApplication {
     this.host.setView('immersive')
     this.hud.setViewMode('immersive')
     this.shell.navigator.switchInGameView('immersive')
+    this.syncTableClock(true)
     this.message = 'Passthrough. The table stays; the room is hidden.'
     this.bump()
   }
@@ -522,10 +526,23 @@ export class ChessApplication {
     if (url && typeof window !== 'undefined') window.location.assign(url)
   }
 
+  /** True while a seek or challenge request is still in flight. */
+  get seeking(): boolean {
+    return this.seekBusy
+  }
+
   /** Seek a 10+0 game with the stored Lichess session. */
   async playOnline(): Promise<void> {
-    this.shell.lobbyPresenter.setTimeControl('10+0')
-    await this.seekFromLobby()
+    if (this.seekBusy) return
+    this.seekBusy = true
+    this.bump()
+    try {
+      this.shell.lobbyPresenter.setTimeControl('10+0')
+      await this.seekFromLobby()
+    } finally {
+      this.seekBusy = false
+      this.bump()
+    }
   }
 
   /** Drop the Lichess session and redraw the signed-out controls. */
@@ -554,8 +571,15 @@ export class ChessApplication {
 
   /** Challenge from the lobby and redraw after the request settles. */
   async challengeFromLobby(): Promise<void> {
-    await this.shell.lobby.challenge()
+    if (this.seekBusy) return
+    this.seekBusy = true
     this.bump()
+    try {
+      await this.shell.lobby.challenge()
+    } finally {
+      this.seekBusy = false
+      this.bump()
+    }
   }
 
   /** Pass and play from the lobby and redraw. */
@@ -611,7 +635,9 @@ export class ChessApplication {
     } catch {
       return
     }
-    if (!url.searchParams.has('code') || !url.searchParams.has('state')) return
+    const code = url.searchParams.has('code') && url.searchParams.has('state')
+    const denied = url.searchParams.has('error') && url.searchParams.has('state')
+    if (!code && !denied) return
     await this.shell.signIn.complete(href)
     if (typeof history !== 'undefined') history.replaceState(null, '', `${url.pathname}${url.hash}`)
     this.bump()
@@ -798,6 +824,13 @@ export class ChessApplication {
     return clock
   }
 
+  private seekBusy = false
+
+  /** The table clock is the only clock a headset can see. Desktop keeps the HUD. */
+  private syncTableClock(visible: boolean): void {
+    this.physicalClock.object.visible = visible
+  }
+
   private fadeTapPlaceholder(): void {
     const material = this.runtime.hall.clockTap.object.material
     if (material instanceof MeshStandardMaterial) {
@@ -827,9 +860,9 @@ export class ChessApplication {
   }
 
   private static redirectUri(): string {
+    const configured = process.env.NEXT_PUBLIC_LICHESS_REDIRECT_URI
+    if (configured) return configured
     if (typeof window === 'undefined') return 'https://vr-chess-hall.netlify.app/'
-    const host = window.location.hostname
-    if (host === 'localhost' || host === '127.0.0.1') return `${window.location.origin}/`
-    return 'https://vr-chess-hall.netlify.app/'
+    return `${window.location.origin}/`
   }
 }

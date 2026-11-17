@@ -2,6 +2,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   Texture,
 } from 'three'
@@ -49,7 +50,7 @@ const PIECE_KEYS = [
 ] as const
 
 /** Stone and cloth stay cheap. Metals keep a reflection map. */
-export type HallMaterial = MeshStandardMaterial | MeshLambertMaterial | MeshBasicMaterial
+export type HallMaterial = MeshPhysicalMaterial | MeshStandardMaterial | MeshLambertMaterial | MeshBasicMaterial
 
 /**
  * Shared materials for the metal set and the black-marble hall.
@@ -85,28 +86,26 @@ export class PieceMaterialSet {
     floorTile.repeat.set(4, 4)
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.18, 0xb4b8c0, 0.12, 1, 1.05, true))
-    this.put('black:idle', this.metal(0xc06a38, 0.2, 0x5a2c16, 0.08, 1, 1.15, true))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.18, 0xc9a44c, 0.22, 1, 1.05, true))
-    this.put('black:selected', this.metal(0xc06a38, 0.2, 0xc9a44c, 0.2, 1, 1.15, true))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.18, 0xb4b8c0, 0.12, 0.7, 1.05, true))
-    this.put('black:dragging', this.metal(0xc06a38, 0.2, 0x5a2c16, 0.08, 0.7, 1.15, true))
+    this.put('white:idle', this.metal(0xe4d6c8, 0.15, 0, 0, 1, 1.35, true))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 1.65, true))
+    this.put('white:selected', this.metal(0xe4d6c8, 0.15, 0xc9a44c, 0.18, 1, 1.35, true))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.16, 1, 1.65, true))
+    this.put('white:dragging', this.metal(0xe4d6c8, 0.15, 0, 0, 0.7, 1.35, true))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 1.65, true))
     for (const finish of ['idle', 'selected', 'dragging'] as const) {
-      const white = this.get('white', finish)
       const black = this.get('black', finish)
-      if (white instanceof MeshStandardMaterial) white.metalness = 0.78
-      if (black instanceof MeshStandardMaterial) black.metalness = 0.8
+      if (black instanceof MeshStandardMaterial) black.metalness = 0.92
     }
 
-    this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4, true))
-    this.put('board:dark', this.marble(darkAtlas, 0.12, 1, 0.06, 0.15, true))
+    this.put('board:light', this.marble(lightAtlas, 0.16, 0, 0.08, 0.4, false, true))
+    this.put('board:dark', this.marble(darkAtlas, 0.12, 0, 0.06, 0.15, false, true))
     this.put('board:frame', this.marble(floorTile, 0.08, 0.85, 0.08, 0.28, true))
     this.put(
       'board:highlight',
       this.make({
-        color: 0xf3e2a4,
-        emissive: 0xc9a44c,
-        emissiveIntensity: 0.9,
+        color: 0x5a3510,
+        emissive: 0x8a5a14,
+        emissiveIntensity: 0.35,
         roughness: 0.28,
         metalness: 0.35,
         clearcoat: 0.4,
@@ -131,7 +130,7 @@ export class PieceMaterialSet {
     this.put(
       'piece:felt',
       this.make({
-        color: 0x1a231c,
+        color: 0x070807,
         roughness: 0.95,
         metalness: 0,
         clearcoat: 0,
@@ -140,8 +139,8 @@ export class PieceMaterialSet {
       }),
     )
 
-    this.put('room:floor', this.marble(floorTile, 0.5, 0, 0.22, 0.35, true))
-    this.put('room:table', this.marble(floorTile, 0.45, 0, 0.22, 0.12, true))
+    this.put('room:floor', this.marble(floorTile, 0.42, 0, 0.18, 0.2, true))
+    this.put('room:table', this.marble(floorTile, 0.38, 0, 0.16, 0.2, true))
     this.put('room:wall', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
     this.put('room:plaster', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
     this.put('room:ceiling', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
@@ -291,7 +290,7 @@ export class PieceMaterialSet {
   bindReflections(texture: Texture): void {
     if (this.reflection && this.reflection !== texture) this.reflection.dispose()
     this.reflection = texture
-    for (const key of PIECE_KEYS) {
+    for (const key of [...PIECE_KEYS, 'board:light', 'board:dark']) {
       const material = this.table.get(key) as MeshStandardMaterial
       material.envMap = texture
       material.needsUpdate = true
@@ -328,8 +327,8 @@ export class PieceMaterialSet {
    * Squares stay opaque until a mirror asks for a blend.
    * Metals use a constant roughness so the fragment shader skips scratch maps.
    */
-  setTier(_tier: 'desktop' | 'quest'): void {
-    this.setMirrorBlend(false)
+  setTier(tier: 'desktop' | 'quest'): void {
+    if (tier === 'quest') this.setMirrorBlend(false)
   }
 
   /**
@@ -406,6 +405,7 @@ export class PieceMaterialSet {
     clearcoatRoughness: number,
     envMapIntensity: number,
     unlit = false,
+    physical = false,
   ): HallMaterial {
     return this.make({
       color: 0xffffff,
@@ -417,6 +417,7 @@ export class PieceMaterialSet {
       envMapIntensity,
       ior: 1.5,
       unlit,
+      physical,
     })
   }
 
@@ -446,6 +447,8 @@ export class PieceMaterialSet {
     polygonOffset?: boolean
     alphaTest?: number
     unlit?: boolean
+    lit?: boolean
+    physical?: boolean
   }): HallMaterial {
     const opacity = args.opacity ?? 1
     const shared = {
@@ -474,14 +477,25 @@ export class PieceMaterialSet {
       if (args.alphaTest !== undefined) basic.alphaTest = args.alphaTest
       return basic
     }
-    const material = args.metalness >= 0.2
-      ? new MeshStandardMaterial({
+    const coated = (args.clearcoat ?? 0) > 0 || args.physical === true
+    const material = coated
+      ? new MeshPhysicalMaterial({
         ...shared,
         roughness: args.roughness,
         metalness: args.metalness,
+        clearcoat: args.clearcoat ?? 0,
+        clearcoatRoughness: args.clearcoatRoughness ?? 0.1,
         envMapIntensity: args.envMapIntensity ?? 1,
+        ior: args.ior ?? 1.5,
       })
-      : new MeshLambertMaterial(shared)
+      : args.metalness >= 0.2 || args.lit
+        ? new MeshStandardMaterial({
+          ...shared,
+          roughness: args.roughness,
+          metalness: args.metalness,
+          envMapIntensity: args.envMapIntensity ?? 1,
+        })
+        : new MeshLambertMaterial(shared)
     if (args.alphaTest !== undefined) material.alphaTest = args.alphaTest
     return material
   }

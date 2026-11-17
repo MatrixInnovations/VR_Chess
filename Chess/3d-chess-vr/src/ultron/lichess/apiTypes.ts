@@ -76,6 +76,7 @@ export interface SeatFace {
   readonly title: string | null;
   readonly rating: number | null;
   readonly ai: boolean;
+  readonly aiLevel?: number | null;
 }
 
 /** Events from `GET /api/board/game/stream/{gameId}`. */
