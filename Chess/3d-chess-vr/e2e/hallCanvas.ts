@@ -24,8 +24,8 @@ export async function waitForHallCanvas(page: Page): Promise<void> {
 export async function expectPiecesShaded(page: Page): Promise<void> {
   await expect.poll(async () => {
     return page.evaluate(() => {
-      const probe = (window as unknown as { __CHESS_PIECE_PROBE__?: { stddev: number; samples: number } }).__CHESS_PIECE_PROBE__
-      return Boolean(probe && probe.samples >= 256 && probe.stddev > 15)
+      const probe = (window as unknown as { __CHESS_PIECE_PROBE__?: { mean: number; stddev: number; samples: number } }).__CHESS_PIECE_PROBE__
+      return Boolean(probe && probe.samples >= 256 && probe.stddev > 15 && probe.mean > 100)
     })
   }, { timeout: 60_000 }).toBe(true)
 }

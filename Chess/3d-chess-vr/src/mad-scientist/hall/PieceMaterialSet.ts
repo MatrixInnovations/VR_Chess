@@ -85,15 +85,17 @@ export class PieceMaterialSet {
     floorTile.repeat.set(4, 4)
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.2, 0, 0, 1, 1.15, true))
-    this.put('black:idle', this.metal(0xc06a38, 0.2, 0, 0, 1, 1.35, true))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.2, 0xc9a44c, 0.12, 1, 1.15, true))
-    this.put('black:selected', this.metal(0xc06a38, 0.2, 0xc9a44c, 0.12, 1, 1.35, true))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.2, 0, 0, 0.7, 1.15, true))
-    this.put('black:dragging', this.metal(0xc06a38, 0.2, 0, 0, 0.7, 1.35, true))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.18, 0xb4b8c0, 0.12, 1, 1.05, true))
+    this.put('black:idle', this.metal(0xc06a38, 0.2, 0x5a2c16, 0.08, 1, 1.15, true))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.18, 0xc9a44c, 0.22, 1, 1.05, true))
+    this.put('black:selected', this.metal(0xc06a38, 0.2, 0xc9a44c, 0.2, 1, 1.15, true))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.18, 0xb4b8c0, 0.12, 0.7, 1.05, true))
+    this.put('black:dragging', this.metal(0xc06a38, 0.2, 0x5a2c16, 0.08, 0.7, 1.15, true))
     for (const finish of ['idle', 'selected', 'dragging'] as const) {
+      const white = this.get('white', finish)
       const black = this.get('black', finish)
-      if (black instanceof MeshStandardMaterial) black.metalness = 0.85
+      if (white instanceof MeshStandardMaterial) white.metalness = 0.78
+      if (black instanceof MeshStandardMaterial) black.metalness = 0.8
     }
 
     this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4, true))

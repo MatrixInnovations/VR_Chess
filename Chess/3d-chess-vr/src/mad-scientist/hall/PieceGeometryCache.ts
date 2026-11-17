@@ -8,7 +8,7 @@ import { LATHE_SEGMENTS, PROFILE } from './PieceProfiles'
 
 const flat = (geometry: BufferGeometry) => (geometry.index ? geometry.toNonIndexed() : geometry)
 
-function merge(parts: BufferGeometry[], smooth = false): BufferGeometry {
+function merge(parts: BufferGeometry[]): BufferGeometry {
   const prepared = parts.map(flat)
   const out = mergeBufferGeometries(prepared)
   for (const part of parts) part.dispose()
@@ -16,52 +16,12 @@ function merge(parts: BufferGeometry[], smooth = false): BufferGeometry {
     if (!parts.includes(part)) part.dispose()
   }
   if (!out) throw new Error('piece geometry merge failed')
-  if (smooth) {
-    out.deleteAttribute('normal')
-    out.computeVertexNormals()
-  }
   out.computeBoundingSphere()
   out.computeBoundingBox()
   return out
 }
 
 const lathe = (kind: keyof typeof PROFILE) => new LatheGeometry([...PROFILE[kind]], LATHE_SEGMENTS)
-
-/** Turn any inward horse normals outward so the head catches the same light as the lathe. */
-function orientOutward(geometry: BufferGeometry): BufferGeometry {
-  const position = geometry.getAttribute('position')
-  const normal = geometry.getAttribute('normal')
-  let cx = 0
-  let cy = 0
-  let cz = 0
-  for (let index = 0; index < position.count; index += 1) {
-    cx += position.getX(index)
-    cy += position.getY(index)
-    cz += position.getZ(index)
-  }
-  const count = position.count || 1
-  cx /= count
-  cy /= count
-  cz /= count
-  for (let index = 0; index < normal.count; index += 1) {
-    const dx = position.getX(index) - cx
-    const dy = position.getY(index) - cy
-    const dz = position.getZ(index) - cz
-    let x = normal.getX(index)
-    let y = normal.getY(index)
-    let z = normal.getZ(index)
-    if (x * dx + y * dy + z * dz < 0) {
-      x = -x
-      y = -y
-      z = -z
-    }
-    y += 0.35
-    const length = Math.hypot(x, y, z) || 1
-    normal.setXYZ(index, x / length, y / length, z / length)
-  }
-  normal.needsUpdate = true
-  return geometry
-}
 
 const box = (w: number, h: number, d: number, x: number, y: number, z: number, rotY = 0) => {
   const geometry = new BoxGeometry(w, h, d)
@@ -108,7 +68,7 @@ function build(kind: PieceKind): BufferGeometry {
     case 'bishop':
       return merge([carveMitreSlit(lathe('bishop'))])
     case 'knight':
-      return orientOutward(merge([lathe('knightBase'), buildKnightHead()], true))
+      return merge([lathe('knightBase'), buildKnightHead()])
     case 'rook': {
       const parts: BufferGeometry[] = [lathe('rook')]
       for (let index = 0; index < 6; index += 1) {

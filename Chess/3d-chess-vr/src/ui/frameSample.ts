@@ -51,6 +51,9 @@ const piecePixels = new Uint8Array(32 * 32 * 4)
 /** Luminance spread a polished piece must show, on a 0–255 scale. */
 export const PIECE_LUMINANCE_STDDEV = 15
 
+/** Mean luminance a bright silver piece must clear. Dark chrome stays under this. */
+export const PIECE_LUMINANCE_MEAN = 100
+
 /** Mean and spread of perceptual luminance over a screen patch. */
 export interface PieceLuminance {
   mean: number

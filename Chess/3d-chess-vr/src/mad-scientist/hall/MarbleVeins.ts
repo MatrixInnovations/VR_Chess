@@ -87,8 +87,8 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix, float lift) {
   float vein = marbleVeinAmt(uv, tile);
   vec3 color;
   if (dark > 0.5) {
-    vec3 base = mix(srgbToLinear(vec3(0.043, 0.043, 0.047)), srgbToLinear(vec3(0.20, 0.18, 0.16)), max(body * 0.35, lift));
-    vec3 veinC = mix(srgbToLinear(vec3(0.620, 0.460, 0.220)), srgbToLinear(vec3(0.850, 0.680, 0.320)), smoothstep(0.55, 1.0, vein));
+    vec3 base = mix(srgbToLinear(vec3(0.18, 0.17, 0.16)), srgbToLinear(vec3(0.26, 0.24, 0.22)), lift);
+    vec3 veinC = srgbToLinear(vec3(0.55, 0.46, 0.30));
     color = mix(base, veinC, clamp(vein * veinMix, 0.0, 1.0));
   } else {
     vec3 base = mix(srgbToLinear(vec3(0.941, 0.922, 0.890)), srgbToLinear(vec3(0.886, 0.867, 0.839)), body * 0.06);
@@ -111,8 +111,8 @@ export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _q
   const light = renderMarble(gl, size, 8, false, 1)
   const dark = renderMarble(gl, size, 8, true, 0.85)
   const frame = renderMarble(gl, size, 1, true, 0.1)
-  const floor = renderMarble(gl, size, 1, true, 0.42, 0.62)
-  const wall = renderMarble(gl, size, 1, true, 0.22, 0.34)
+  const floor = renderMarble(gl, size, 1, true, 0.16, 0.45)
+  const wall = renderMarble(gl, size, 1, true, 0.08, 0.28)
   floor.texture.repeat.set(4, 4)
   wall.texture.repeat.set(1.5, 1.5)
   materials.installBakedMarble({

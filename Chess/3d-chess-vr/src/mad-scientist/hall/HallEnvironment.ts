@@ -23,7 +23,7 @@ export function darkHallEnvScene(): Scene {
   const scene = new Scene()
   const room = new Mesh(
     new BoxGeometry(10, 8, 10),
-    new MeshBasicMaterial({ color: 0x0c0b0a, side: BackSide }),
+    new MeshBasicMaterial({ color: 0x9aa0a8, side: BackSide }),
   )
   room.position.y = 2.2
   scene.add(room)
@@ -44,9 +44,9 @@ export function darkHallEnvScene(): Scene {
     light.lookAt(0, 1.1, 0)
     scene.add(light)
   }
-  panel(5.5, 3.4, [1, 0.97, 0.9], 22, 0, 4.8, 0.1)
-  panel(2.6, 1.8, [1, 0.84, 0.68], 12, 1.6, 2.8, 2.2)
-  panel(1.8, 2.4, [0.72, 0.8, 1], 5, -2.6, 2.0, 1.4)
+  panel(7.5, 5.2, [1, 0.98, 0.94], 28, 0, 4.6, 0.2)
+  panel(3.2, 2.2, [1, 0.92, 0.82], 14, 1.4, 2.6, 2.4)
+  panel(3.0, 1.2, [0.16, 0.15, 0.14], 1, 0, 0.2, -2.2)
   return scene
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PIECE_LUMINANCE_STDDEV, publishFrameSample, readCenterProbe, readLuminanceStats } from './frameSample'
+import { PIECE_LUMINANCE_MEAN, PIECE_LUMINANCE_STDDEV, publishFrameSample, readCenterProbe, readLuminanceStats } from './frameSample'
 
 describe('publishFrameSample', () => {
   it('marks the canvas after it has a real drawing size', () => {
@@ -93,6 +93,7 @@ describe('publishFrameSample', () => {
       32,
     )
     expect(shaded?.stddev ?? 0).toBeGreaterThan(PIECE_LUMINANCE_STDDEV)
+    expect(shaded?.mean ?? 0).toBeGreaterThan(PIECE_LUMINANCE_MEAN)
     expect(readLuminanceStats(
       { domElement: { width: 64, height: 64 }, getContext: () => null },
       { x: 2, y: 0 },
