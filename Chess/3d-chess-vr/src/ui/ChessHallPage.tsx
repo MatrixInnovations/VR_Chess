@@ -53,22 +53,21 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
     if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
     const stripAuthQuery = () => {
-      const loc = window.location
-      if (!loc.search.includes('error=') && !loc.search.includes('code=')) return
-      const clean = `${loc.pathname}${loc.hash}` || '/'
-      const state = window.history.state as { url?: string; as?: string } | null
-      if (state && typeof state === 'object') {
-        state.url = clean
-        state.as = clean
+      try {
+        const loc = window.location
+        if (!loc.search.includes('error=') && !loc.search.includes('code=')) return
+        const clean = `${loc.pathname}${loc.hash}` || '/'
+        window.history.replaceState(null, '', clean)
+      } catch {
+        // Next may still be writing the first history entry. The interval tries again.
       }
-      window.history.replaceState(state, '', clean)
     }
-    void model.completeRedirectIfPresent(window.location.href).finally(() => {
-      stripAuthQuery()
-      const timer = window.setInterval(stripAuthQuery, 100)
-      window.setTimeout(() => window.clearInterval(timer), 2000)
-    })
+    stripAuthQuery()
+    const timer = window.setInterval(stripAuthQuery, 50)
+    window.setTimeout(() => window.clearInterval(timer), 8000)
+    void model.completeRedirectIfPresent(window.location.href)
     return () => {
+      window.clearInterval(timer)
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
     }
   }, [model])
