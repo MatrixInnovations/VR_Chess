@@ -111,8 +111,8 @@ describe('coordinate glyphs', () => {
       },
     }
     paintCoordinateGlyphs(ctx as unknown as CanvasRenderingContext2D, 2048)
-    expect(ctx.font).toBe('400 48px Georgia')
-    expect(ctx.fillStyle).toBe('#E8D4B0')
+    expect(ctx.font).toBe('600 72px Georgia')
+    expect(ctx.fillStyle).toBe('#F0D78A')
     expect(drawn.filter((glyph) => glyph === 'a').length).toBeGreaterThan(0)
     expect(drawn).toContain('1')
     expect(drawn).toContain('h')
@@ -123,7 +123,7 @@ describe('coordinate glyphs', () => {
     const data = coordinateImage(size)
     const band = Math.round((0.032 / 0.464) * size)
     const along = band + ((3 + 0.5) / 8) * (size - band * 2)
-    const scale = 3
+    const scale = 5
     const width = 5 * scale
     const height = 7 * scale
     const left = Math.round(along - width / 2)
@@ -172,6 +172,13 @@ describe('piece geometry', () => {
   it('shares a non-indexed knight and keeps a visible bishop slit', () => {
     const knight = pieceGeometry('knight')
     expect(knight.index).toBeNull()
+    const normals = knight.getAttribute('normal')
+    expect(normals).toBeTruthy()
+    let spread = 0
+    for (let index = 0; index < Math.min(normals.count, 40); index += 1) {
+      spread = Math.max(spread, Math.abs(normals.getX(index)), Math.abs(normals.getY(index)), Math.abs(normals.getZ(index)))
+    }
+    expect(spread).toBeGreaterThan(0.4)
     const bishop = pieceGeometry('bishop')
     expect(bishop.index).toBeNull()
     const raw = new LatheGeometry([...PROFILE.bishop], LATHE_SEGMENTS)

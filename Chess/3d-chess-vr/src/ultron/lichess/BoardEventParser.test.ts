@@ -27,7 +27,29 @@ describe('BoardEventParser', () => {
     if (parsed.kind !== 'board' || parsed.event.type !== 'gameFull') throw new Error('expected gameFull');
     expect(parsed.event.state.moves).toEqual(['e2e4', 'e7e5']);
     expect(parsed.event.whiteId).toBe('ada');
+    expect(parsed.event.white?.name).toBe('Ada');
     expect(parsed.event.variant).toBe('standard');
+    const ai = parser.parse({
+      type: 'gameFull',
+      id: 'aiGame',
+      variant: { key: 'standard' },
+      white: { id: 'ada', name: 'Ada', rating: 1800, title: 'FM' },
+      black: { id: 'stockfish', aiLevel: 6 },
+      state: {
+        type: 'gameState',
+        moves: '',
+        wtime: 1,
+        btime: 1,
+        winc: 0,
+        binc: 0,
+        status: 'started',
+      },
+    });
+    if (ai.kind !== 'board' || ai.event.type !== 'gameFull') throw new Error('expected ai game');
+    expect(ai.event.white?.title).toBe('FM');
+    expect(ai.event.white?.rating).toBe(1800);
+    expect(ai.event.black?.ai).toBe(true);
+    expect(ai.event.black?.name).toBe('Lichess AI');
   });
 
   it('parses gameState, gameStart, and challenge events', () => {

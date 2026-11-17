@@ -87,7 +87,7 @@ export class ChessHall {
     this.materials = options.materials ?? new PieceMaterialSet()
     this.board = new BoardModel(this.materials)
     this.lighting = new HallLighting()
-    this.clockTap = new ClockTapTarget({ x: 0.42, y: TABLE_TOP_Y + 0.03, z: 0.05 })
+    this.clockTap = new ClockTapTarget({ x: 0.33, y: TABLE_TOP_Y + 0.03, z: 0.32 })
     this.camera = new PerspectiveCamera(50, 1, 0.05, 20)
     // Sit behind the near table edge and look slightly down at the board.
     this.camera.position.set(0, SEATED_EYE_HEIGHT_M, SEATED_EYE_Z_M)

@@ -380,6 +380,8 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
       this.variant = event.variant;
       this.variantSupported = event.variant === 'standard' || event.variant === 'fromPosition';
       this.assignColor(event.whiteId, event.blackId);
+      if (event.white) this.whiteSeat = event.white;
+      if (event.black) this.blackSeat = event.black;
       this.applyAuthoritative(event.state, true);
       return;
     }
@@ -456,6 +458,33 @@ export class GameSession implements IGameCommandSink, IGameSession, ILichessInbo
 
   private accountId = '';
   private accountName = '';
+
+  private whiteSeat: import('../lichess/apiTypes').SeatFace | null = null;
+
+  private blackSeat: import('../lichess/apiTypes').SeatFace | null = null;
+
+  /**
+   * The other seat in a live game.
+   * AI opponents are labeled and have no profile link. Null until a gameFull arrives.
+   */
+  opponentCard(): {
+    username: string;
+    title: string | null;
+    rating: number | null;
+    ai: boolean;
+    ourColor: 'white' | 'black';
+  } | null {
+    if (this.ourColor !== 'white' && this.ourColor !== 'black') return null;
+    const seat = this.ourColor === 'white' ? this.blackSeat : this.whiteSeat;
+    if (!seat) return null;
+    return {
+      username: seat.name,
+      title: seat.title,
+      rating: seat.rating,
+      ai: seat.ai,
+      ourColor: this.ourColor,
+    };
+  }
 
   private async submitMove(intent: Extract<SessionIntent, { kind: 'move' }>): Promise<SubmitResult> {
     if (this.unauthorized) return { ok: false, reason: 'unauthorized' };

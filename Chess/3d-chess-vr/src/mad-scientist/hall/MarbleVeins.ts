@@ -73,7 +73,7 @@ float marbleVeinAmt(vec2 uv, vec2 tile) {
   return vein;
 }
 vec3 srgbToLinear(vec3 c) { return pow(c, vec3(2.2)); }
-vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix) {
+vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix, float lift) {
   float seed = fract(sin(dot(tile, vec2(19.17, 73.13))) * 43758.5453);
   float ang = seed * 6.2831853 * 0.70;
   vec2 p = uv - 0.5;
@@ -87,7 +87,7 @@ vec3 marbleAlbedo(vec2 uv, vec2 tile, float dark, float veinMix) {
   float vein = marbleVeinAmt(uv, tile);
   vec3 color;
   if (dark > 0.5) {
-    vec3 base = mix(srgbToLinear(vec3(0.043, 0.043, 0.047)), srgbToLinear(vec3(0.086, 0.078, 0.071)), body * 0.35);
+    vec3 base = mix(srgbToLinear(vec3(0.043, 0.043, 0.047)), srgbToLinear(vec3(0.20, 0.18, 0.16)), max(body * 0.35, lift));
     vec3 veinC = mix(srgbToLinear(vec3(0.620, 0.460, 0.220)), srgbToLinear(vec3(0.850, 0.680, 0.320)), smoothstep(0.55, 1.0, vein));
     color = mix(base, veinC, clamp(vein * veinMix, 0.0, 1.0));
   } else {
@@ -111,8 +111,8 @@ export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _q
   const light = renderMarble(gl, size, 8, false, 1)
   const dark = renderMarble(gl, size, 8, true, 0.85)
   const frame = renderMarble(gl, size, 1, true, 0.1)
-  const floor = renderMarble(gl, size, 1, true, 0.12)
-  const wall = renderMarble(gl, size, 1, true, 0.12)
+  const floor = renderMarble(gl, size, 1, true, 0.42, 0.62)
+  const wall = renderMarble(gl, size, 1, true, 0.22, 0.34)
   floor.texture.repeat.set(4, 4)
   wall.texture.repeat.set(1.5, 1.5)
   materials.installBakedMarble({
@@ -130,7 +130,7 @@ export function bakeMarbleGpu(gl: WebGLRenderer, materials: PieceMaterialSet, _q
   }
 }
 
-function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: boolean, veinMix: number): WebGLRenderTarget {
+function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: boolean, veinMix: number, lift = 0): WebGLRenderTarget {
   const mipmaps = size > 0 && (size & (size - 1)) === 0
   const target = new WebGLRenderTarget(size, size, {
     magFilter: LinearFilter,
@@ -147,6 +147,7 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
     uniforms: {
       uDark: { value: dark ? 1 : 0 },
       uVeinMix: { value: veinMix },
+      uLift: { value: lift },
       uCells: { value: cells },
     },
     vertexShader: /* glsl */ `
@@ -160,12 +161,13 @@ function renderMarble(gl: WebGLRenderer, size: number, cells: number, dark: bool
       varying vec2 vUv;
       uniform float uDark;
       uniform float uVeinMix;
+      uniform float uLift;
       uniform float uCells;
       ${MARBLE_GLSL}
       void main() {
         vec2 tile = floor(vUv * uCells);
         vec2 localUv = fract(vUv * uCells);
-        vec3 linear = marbleAlbedo(localUv, tile, uDark, uVeinMix);
+        vec3 linear = marbleAlbedo(localUv, tile, uDark, uVeinMix, uLift);
         gl_FragColor = vec4(linear, 1.0);
       }
     `,

@@ -140,9 +140,9 @@ export class PieceMaterialSet {
 
     this.put('room:floor', this.marble(floorTile, 0.5, 0, 0.22, 0.35, true))
     this.put('room:table', this.marble(floorTile, 0.45, 0, 0.22, 0.12, true))
-    this.put('room:wall', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
-    this.put('room:plaster', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
-    this.put('room:ceiling', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:wall', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:plaster', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:ceiling', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
     this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35 }))
     this.put('room:leg', this.make({ color: 0x141210, roughness: 0.35, metalness: 0.05, clearcoat: 0.2, clearcoatRoughness: 0.35, envMapIntensity: 0.8 }))

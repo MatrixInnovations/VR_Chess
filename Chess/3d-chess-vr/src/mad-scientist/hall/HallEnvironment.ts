@@ -5,9 +5,12 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  CubeCamera,
   PMREMGenerator,
   Scene,
   Texture,
+  WebGLCubeRenderTarget,
+  sRGBEncoding,
   type WebGLRenderer,
 } from 'three'
 
@@ -66,8 +69,13 @@ export function buildEnvironment(
 }
 
 function bakePmrem(renderer: WebGLRenderer, envScene: Scene): { texture: Texture } {
+  const cube = new WebGLCubeRenderTarget(32, { encoding: sRGBEncoding })
+  const camera = new CubeCamera(0.1, 20, cube)
+  camera.position.set(0, 1.2, 0)
+  camera.update(renderer, envScene)
   const pmrem = new PMREMGenerator(renderer)
-  const target = pmrem.fromScene(envScene, 0.04)
+  const target = pmrem.fromCubemap(cube.texture)
   pmrem.dispose()
+  cube.dispose()
   return target
 }

@@ -4,6 +4,7 @@ const staticExport = process.env.STATIC_EXPORT === '1'
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  devIndicators: false,
   experimental: {
     // Fridae's clock lives outside this app so the lane package can keep its own tests.
     externalDir: true,

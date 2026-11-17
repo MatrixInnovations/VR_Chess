@@ -29,8 +29,8 @@ export function coordinateBorderTexture(): Texture {
 /** Draws a–h and 1–8. Cap height is 48px, about 0.011 m on the 0.464 m board. */
 export function paintCoordinateGlyphs(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.clearRect(0, 0, size, size)
-  ctx.fillStyle = '#E8D4B0'
-  ctx.font = '400 48px Georgia'
+  ctx.fillStyle = '#F0D78A'
+  ctx.font = '600 72px Georgia'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const band = (0.032 / 0.464) * size
@@ -141,7 +141,7 @@ function publish(data: Uint8Array, size: number): DataTexture {
 function stamp(data: Uint8Array, size: number, glyph: string, cx: number, cy: number, turned = false): void {
   const rows = FONT[glyph]
   if (!rows) return
-  const scale = 3
+  const scale = 5
   const width = rows[0].length * scale
   const height = rows.length * scale
   const left = Math.round(cx - width / 2)
@@ -157,9 +157,9 @@ function stamp(data: Uint8Array, size: number, glyph: string, cx: number, cy: nu
           const y = top + row * scale + dy
           if (x < 0 || y < 0 || x >= size || y >= size) continue
           const i = (y * size + x) * 4
-          data[i] = 255
-          data[i + 1] = 255
-          data[i + 2] = 255
+          data[i] = 240
+          data[i + 1] = 215
+          data[i + 2] = 138
           data[i + 3] = 255
         }
       }

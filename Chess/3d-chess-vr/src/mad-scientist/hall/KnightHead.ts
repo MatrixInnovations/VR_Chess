@@ -33,12 +33,12 @@ export function buildKnightHead(): BufferGeometry {
   const geometry = new ExtrudeGeometry(knightShape(), {
     depth: 0.028,
     steps: 1,
-    curveSegments: 12,
+    curveSegments: 16,
     bevelEnabled: true,
     bevelThickness: 0.003,
     bevelSize: 0.0026,
     bevelOffset: 0,
-    bevelSegments: 3,
+    bevelSegments: 4,
   })
   geometry.translate(0, 0, -0.014)
   shapeKnight(geometry)
@@ -79,7 +79,7 @@ function place(
 
 function shapeKnight(geometry: ExtrudeGeometry): void {
   const position = geometry.getAttribute('position')
-  const half = 0.014
+  const half = 0.018
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index)
     const y = position.getY(index)

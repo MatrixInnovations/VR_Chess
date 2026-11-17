@@ -12,6 +12,7 @@ import { ChessHallView } from '../mad-scientist/react/ChessHallView'
 import { BOARD_SURFACE_Y, SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
 import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
 import { publishFrameSample, readCenterProbe, readLuminanceStats, type FrameProbe, type PieceLuminance } from './frameSample'
+import { LichessDock } from './LichessDock'
 
 const boardProbePoint = new Vector3()
 
@@ -119,6 +120,14 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           </button>
         </section>
       ) : null}
+      <LichessDock
+        username={signIn.username}
+        signedIn={signIn.phase === 'signed-in' && Boolean(signIn.username)}
+        opponent={model.opponentCard()}
+        onSignIn={() => void model.beginSignIn()}
+        onPlay={() => void model.playOnline()}
+        onSignOut={() => void model.signOutOfLichess()}
+      />
       <div className="hall-actions">
         <button type="button" onClick={() => void model.toggleImmersive()}>
           {model.presentation === 'immersive' ? 'Back to 3D' : '3D / Immersive'}
@@ -185,7 +194,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
       </p>
       <div className="hall-stage">
         {mounted ? <Canvas
-          dpr={typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent) ? 1 : [1, 1.5]}
+          dpr={1}
           shadows="percentage"
           gl={{ preserveDrawingBuffer: keepDrawingBuffer(), antialias: false }}
           camera={model.runtime.hall.camera}

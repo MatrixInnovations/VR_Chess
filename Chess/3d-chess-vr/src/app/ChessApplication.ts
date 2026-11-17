@@ -214,6 +214,7 @@ export class ChessApplication {
       },
       wasOffline: () => this.session.snapshot.mode === 'offline',
     })
+    this.shell.signIn.sync()
     this.shell.navigator.showBoard(this.viewPort)
     this.shell.navigator.subscribe(() => this.bump())
     this.shell.board.mountLive(this.viewPort, null, true)
@@ -229,6 +230,7 @@ export class ChessApplication {
     this.xrPump = new XrInputPump(this.picker, this.runtime.controllers, this.runtime.hands)
     this.physicalClock = new PhysicalChessClock()
     this.physicalClock.object.position.copy(this.runtime.hall.clockTap.object.position)
+    this.physicalClock.object.visible = false
     this.runtime.hall.root.add(this.physicalClock.object)
     this.fadeTapPlaceholder()
     this.voicePort = new VoiceSessionPort(this.session, (text) => {
@@ -515,7 +517,26 @@ export class ChessApplication {
   /** Start PKCE and redraw when the authorize URL is ready. */
   async beginSignIn(): Promise<void> {
     await this.shell.signIn.begin()
+    const url = this.shell.authPresenter.snapshot().authorizationUrl
     this.bump()
+    if (url && typeof window !== 'undefined') window.location.assign(url)
+  }
+
+  /** Seek a 10+0 game with the stored Lichess session. */
+  async playOnline(): Promise<void> {
+    this.shell.lobbyPresenter.setTimeControl('10+0')
+    await this.seekFromLobby()
+  }
+
+  /** Drop the Lichess session and redraw the signed-out controls. */
+  async signOutOfLichess(): Promise<void> {
+    await this.shell.signIn.signOut()
+    this.bump()
+  }
+
+  /** The other player in the current online game, or null offline. */
+  opponentCard(): ReturnType<GameSession['opponentCard']> {
+    return this.session.opponentCard()
   }
 
   /** Open the lobby from a stored session and redraw. Signed-out players see sign-in. */
@@ -806,7 +827,9 @@ export class ChessApplication {
   }
 
   private static redirectUri(): string {
-    if (typeof window === 'undefined') return 'http://localhost:3000/'
-    return `${window.location.origin}/`
+    if (typeof window === 'undefined') return 'https://vr-chess-hall.netlify.app/'
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return `${window.location.origin}/`
+    return 'https://vr-chess-hall.netlify.app/'
   }
 }
