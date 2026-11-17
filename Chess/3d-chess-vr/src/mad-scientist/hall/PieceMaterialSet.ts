@@ -86,11 +86,11 @@ export class PieceMaterialSet {
     floorTile.repeat.set(4, 4)
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xe4d6c8, 0.15, 0, 0, 1, 1.35, true))
+    this.put('white:idle', this.metal(0xe4d6c8, 0.22, 0, 0, 1, 1.15, true))
     this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 1.65, true))
-    this.put('white:selected', this.metal(0xe4d6c8, 0.15, 0xc9a44c, 0.18, 1, 1.35, true))
+    this.put('white:selected', this.metal(0xe4d6c8, 0.22, 0xc9a44c, 0.18, 1, 1.15, true))
     this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.16, 1, 1.65, true))
-    this.put('white:dragging', this.metal(0xe4d6c8, 0.15, 0, 0, 0.7, 1.35, true))
+    this.put('white:dragging', this.metal(0xe4d6c8, 0.22, 0, 0, 0.7, 1.15, true))
     this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 1.65, true))
     for (const finish of ['idle', 'selected', 'dragging'] as const) {
       const black = this.get('black', finish)
