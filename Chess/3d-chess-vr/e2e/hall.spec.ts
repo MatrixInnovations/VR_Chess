@@ -55,7 +55,7 @@ test('dismiss is clickable and a cancelled Lichess sign-in stays on screen', asy
   await expect(dismissed).toBeVisible()
   await dismissed.click()
   await expect(dismissed).toHaveCount(0)
-  await expect(page.getByText('Lichess sign-in was cancelled. You can try again anytime.')).toBeVisible()
+  await expect(page.locator('.hall-lichess').getByText('Lichess sign-in was cancelled. You can try again anytime.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in with Lichess' })).toBeEnabled()
   await expect(page).not.toHaveURL(/error=/)
 })
