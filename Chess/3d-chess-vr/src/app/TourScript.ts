@@ -10,7 +10,7 @@ export function tourSteps(): readonly ITourStep[] {
     {
       id: 'seat',
       title: 'You are seated at the board',
-      body: 'This is a wooden hall, seen from a chair. Drag a piece with the mouse, or pinch it with a Quest hand.',
+      body: 'This is a marble hall, seen from a chair. Drag a piece with the mouse, or pinch it with a Quest hand.',
     },
     {
       id: 'moves',

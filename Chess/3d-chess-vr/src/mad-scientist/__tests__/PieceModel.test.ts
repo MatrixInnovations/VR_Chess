@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Group } from 'three'
+import { Group, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial } from 'three'
 
 import type { PieceKind } from '../contracts/types'
 import { BoardModel } from '../hall/BoardModel'
@@ -20,43 +20,58 @@ describe('PieceMaterialSet', () => {
 
     expect(white).not.toBe(black)
     expect(white.color.getHex()).not.toBe(black.color.getHex())
-    expect(selected.emissiveIntensity).toBeGreaterThan(0)
-    expect(white.emissiveIntensity).toBe(0)
+    expect((selected as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
+    expect((white as MeshStandardMaterial).emissiveIntensity).toBe(0)
     expect(dragging.transparent).toBe(true)
     expect(dragging.opacity).toBeLessThan(1)
   })
 
-  it('uses felt and wood board finishes and keeps the Quest material budget honest', () => {
+  it('uses marble and metal finishes and keeps the Quest material budget shared', () => {
     const set = new PieceMaterialSet()
-    const felt = set.boardSquare('light')
-    const wood = set.boardSquare('dark')
+    const cream = set.boardSquare('light')
+    const marble = set.boardSquare('dark')
     const white = set.get('white', 'idle')
     const black = set.get('black', 'idle')
     const budget = set.gpuBudget()
 
-    expect(felt).not.toBe(wood)
-    expect(felt.color.getHex()).toBeGreaterThan(wood.color.getHex())
-    expect(felt.roughness).toBeGreaterThan(0.85)
-    expect(wood.roughness).toBeGreaterThan(0.4)
-    expect(wood.roughness).toBeLessThan(0.8)
-    expect(white.roughness).not.toBeCloseTo(black.roughness, 1)
-    expect(Math.abs(white.roughness - black.roughness)).toBeGreaterThan(0.15)
-    expect(white.metalness).toBeLessThan(0.2)
-    expect(black.metalness).toBeLessThan(0.25)
-    expect(budget.textureCount).toBe(0)
-    felt.map = {} as typeof felt.map
-    expect(set.gpuBudget().textureCount).toBe(1)
-    felt.map = null
-    expect(set.gpuBudget().textureCount).toBe(0)
-    expect(budget.materialCount).toBeLessThanOrEqual(16)
+    expect(cream).not.toBe(marble)
+    expect(cream.color.getHex()).toBe(0xffffff)
+    expect(marble.color.getHex()).toBe(0xffffff)
+    const creamPixel = (cream.map as { image: { data: Uint8Array } }).image.data
+    const marblePixel = (marble.map as { image: { data: Uint8Array } }).image.data
+    expect(creamPixel[0]).toBeGreaterThan(180)
+    expect(marblePixel[0]).toBeLessThan(80)
+    expect(cream).toBeInstanceOf(MeshPhysicalMaterial)
+    expect(marble).toBeInstanceOf(MeshPhysicalMaterial)
+    expect((cream as MeshPhysicalMaterial).clearcoat).toBe(0)
+    expect((cream as MeshPhysicalMaterial).roughness).toBeCloseTo(0.16)
+    expect((cream as MeshPhysicalMaterial).envMapIntensity).toBeCloseTo(0.4)
+    expect(white).toBeInstanceOf(MeshStandardMaterial)
+    expect(black).toBeInstanceOf(MeshStandardMaterial)
+    expect((white as MeshStandardMaterial).roughness).toBeCloseTo(0.22)
+    expect((white as MeshStandardMaterial).metalness).toBeCloseTo(1)
+    expect((black as MeshStandardMaterial).metalness).toBeCloseTo(0.92)
+    expect((white as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.15)
+    expect((black as MeshStandardMaterial).envMapIntensity).toBeCloseTo(1.65)
+    expect(white.color.getHex()).toBe(0xe4d6c8)
+    expect(black.color.getHex()).toBe(0xc06a38)
+    expect(set.get('black', 'selected')).toBeInstanceOf(MeshStandardMaterial)
+    expect((set.get('black', 'selected') as MeshStandardMaterial).metalness).toBeCloseTo(0.92)
+    expect(set.gold().color.getHex()).toBe(0xc9a44c)
+    expect(set.felt()).toBeInstanceOf(MeshLambertMaterial)
+    const before = budget.textureCount
+    expect(before).toBeGreaterThan(0)
+    expect(before).toBeLessThanOrEqual(48)
+    const saved = cream.map
+    cream.map = null
+    expect(set.gpuBudget().textureCount).toBe(before - 1)
+    cream.map = saved
+    expect(set.gpuBudget().textureCount).toBe(before)
+    expect(budget.materialCount).toBeLessThanOrEqual(24)
     expect(budget.materialCount).toBeGreaterThan(6)
     expect(PerformanceBudget.QUEST_PRO_FLOOR_FPS).toBe(72)
     expect(PerformanceBudget.QUEST_PRO_TARGET_FPS).toBe(90)
-    for (const material of [felt, wood, white, black, set.boardFrame(), set.highlightMaterial()]) {
-      expect(material.map).toBeNull()
-      expect(material.normalMap).toBeNull()
-      expect(material.roughnessMap).toBeNull()
-    }
+    expect(white.map).toBeNull()
   })
 })
 
@@ -76,7 +91,7 @@ describe('PieceModel', () => {
     const idle = pawn.currentMaterial()
     pawn.applyFinish('selected')
     expect(pawn.currentMaterial()).not.toBe(idle)
-    expect(pawn.currentMaterial().emissiveIntensity).toBeGreaterThan(0)
+    expect((pawn.currentMaterial() as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
 
     materials.apply(pawn, 'white', 'dragging')
     expect(pawn.currentMaterial().transparent).toBe(true)
@@ -88,6 +103,17 @@ describe('PieceModel', () => {
     expect(pawn.object.position.x).toBeCloseTo(home.x)
     expect(pawn.object.position.z).toBeCloseTo(home.z)
     expect(pawn.getSquare()).toEqual(whitePawn().square)
+
+    const queenside = new PieceModel(whitePawn({ id: 'wq', kind: 'knight', square: { file: 1, rank: 0 } }), materials, board)
+    const kingside = new PieceModel(whitePawn({ id: 'wk', kind: 'knight', square: { file: 6, rank: 0 } }), materials, board)
+    const black = new PieceModel(
+      whitePawn({ id: 'bq', kind: 'knight', color: 'black', square: { file: 1, rank: 7 } }),
+      materials,
+      board,
+    )
+    expect(queenside.object.children[0].rotation.y).toBeCloseTo(Math.PI / 2 - 0.65)
+    expect(kingside.object.children[0].rotation.y).toBeCloseTo(Math.PI / 2 + 0.65)
+    expect(black.object.children[0].rotation.y).toBeCloseTo(-(Math.PI / 2 - 0.65))
   })
 
   it('previews in the air without changing the logical square, then snaps back', () => {
@@ -119,10 +145,15 @@ describe('PieceModel', () => {
     ).toThrow(/dragon/)
 
     const pawn = new PieceModel(whitePawn(), materials, board)
+    const geometry = pawn.meshes()[0].geometry
+    const again = new PieceModel(whitePawn({ id: 'second' }), materials, board)
+    expect(again.meshes()[0].geometry).toBe(geometry)
     const parent = new Group()
     parent.add(pawn.object)
     pawn.dispose()
     expect(pawn.object.parent).toBeNull()
+    expect(again.meshes()[0].geometry).toBe(geometry)
+    expect(geometry.getAttribute('position')).toBeTruthy()
     materials.dispose()
   })
 })

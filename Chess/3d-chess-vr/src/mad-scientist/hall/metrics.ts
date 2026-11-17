@@ -7,6 +7,15 @@
 /** 5cm squares. An 8x8 board is 40cm across, a full-size tournament board. */
 export const SQUARE_SIZE_M = 0.05
 
+/** Gold line that fills the 4% gap between squares. */
+export const INLAY_WIDTH_M = 0.002
+
+/** Black marble lip from the playing edge to the outer gold. */
+export const FRAME_WIDTH_M = 0.032
+
+/** Product king height. Lathe profiles are scaled to this. */
+export const KING_HEIGHT_M = 0.08
+
 /** Top of the table, meters above the floor. */
 export const TABLE_TOP_Y = 0.74
 

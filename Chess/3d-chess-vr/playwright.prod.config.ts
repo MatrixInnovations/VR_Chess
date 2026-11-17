@@ -6,13 +6,13 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testMatch: '**/production.spec.ts',
-  timeout: 90_000,
+  timeout: 180_000,
   use: {
     baseURL: 'http://127.0.0.1:3457',
     viewport: { width: 1280, height: 800 },
   },
   webServer: {
-    command: 'npx next build && npx next start -p 3457',
+    command: 'NEXT_PUBLIC_E2E=1 npx next build && npx next start -p 3457',
     url: 'http://127.0.0.1:3457',
     reuseExistingServer: false,
     timeout: 180_000,

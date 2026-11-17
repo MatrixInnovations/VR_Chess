@@ -41,7 +41,7 @@ npm run test:e2e
 
 `npm test` is `vitest run --coverage`. Changed source stays at or above 80% lines and 75% branches. `GameSession`, `LichessClient`, `ChessPhraseParser`, and `ViewModeManager` stay at or above 90% lines. The Fridae clock package reports its own 90% line gate with `npm run test:clock`.
 
-Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_LICHESS_CLIENT_ID`. The redirect URI is the site origin with a trailing slash. The access token stays in `sessionStorage`.
+Copy `.env.example` to `.env.local`. The production OAuth client id is `vr-chess-hall`. Set `NEXT_PUBLIC_LICHESS_CLIENT_ID` to that id, or to a preview app's id. The redirect is `NEXT_PUBLIC_LICHESS_REDIRECT_URI` when set, otherwise `${window.location.origin}/`, so a preview does not bounce to production. Register that exact URI, including the trailing slash, on the Lichess app. Scopes stay `board:play`, `challenge:read`, and `challenge:write`. The access token stays in `sessionStorage`.
 
 Quest Browser will not start WebXR on a self-signed certificate. Serve the app over HTTPS you trust, sign in before entering VR, and open `?xr=emulate` only when you want the in-repo Quest Pro emulator.
 

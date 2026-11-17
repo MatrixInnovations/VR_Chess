@@ -19,13 +19,19 @@ export class AuthFailureClassifier {
   classify(error: unknown): IAuthFailure {
     const code = this.readCode(error)
     const raw = error instanceof Error ? error.message : ''
+    const cancelled = 'Lichess sign-in was cancelled. You can try again anytime.'
     if (code === 'cancelled' || /cancel/i.test(raw)) {
-      return { kind: 'cancelled', message: 'Sign-in cancelled' }
+      return { kind: 'cancelled', message: cancelled }
     }
-    if (code === 'denied' || code === 'access_denied' || /denied/i.test(raw)) {
-      return { kind: 'denied', message: 'Sign-in was denied' }
+    if (
+      code === 'denied' ||
+      code === 'access_denied' ||
+      code === 'authorization-denied' ||
+      /denied/i.test(raw)
+    ) {
+      return { kind: 'denied', message: cancelled }
     }
-    return { kind: 'failed', message: 'Sign-in could not be completed' }
+    return { kind: 'failed', message: 'Lichess sign-in could not be completed. You can try again anytime.' }
   }
 
   private readCode(error: unknown): string {

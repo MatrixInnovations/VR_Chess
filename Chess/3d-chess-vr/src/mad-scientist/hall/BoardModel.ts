@@ -1,9 +1,10 @@
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
+import { BoxGeometry, BufferAttribute, Group, Mesh, PlaneGeometry, Vector3 } from 'three'
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import { isOnBoard, squareKey } from '../contracts/squares'
 import type { Square } from '../contracts/types'
-import { BOARD_SURFACE_Y, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
-import { PieceMaterialSet } from './PieceMaterialSet'
+import { BOARD_SURFACE_Y, FRAME_WIDTH_M, INLAY_WIDTH_M, SQUARE_SIZE_M, SQUARE_THICKNESS_M } from './metrics'
+import { PieceMaterialSet, type HallMaterial } from './PieceMaterialSet'
 
 /**
  * World position of a square's top-center, in meters.
@@ -30,13 +31,13 @@ export class BoardModel {
 
   private readonly squares = new Map<string, Mesh>()
 
-  private readonly baseMaterials = new Map<string, MeshStandardMaterial>()
+  private readonly baseMaterials = new Map<string, HallMaterial>()
 
-  private readonly highlightMaterial: MeshStandardMaterial
+  private readonly highlightMaterial: HallMaterial
 
   private readonly highlighted = new Set<string>()
 
-  private readonly geometries: BoxGeometry[] = []
+  private readonly geometries: { dispose: () => void }[] = []
 
   private readonly materials: PieceMaterialSet
 
@@ -65,6 +66,7 @@ export class BoardModel {
       const key = squareKey(square)
       const mesh = this.squares.get(key) as Mesh
       mesh.material = this.highlightMaterial
+      mesh.visible = true
       this.highlighted.add(key)
     }
   }
@@ -73,7 +75,8 @@ export class BoardModel {
   clearHighlights(): void {
     for (const key of this.highlighted) {
       const mesh = this.squares.get(key) as Mesh
-      mesh.material = this.baseMaterials.get(key) as MeshStandardMaterial
+      mesh.material = this.baseMaterials.get(key) as HallMaterial
+      mesh.visible = false
     }
     this.highlighted.clear()
   }
@@ -127,45 +130,165 @@ export class BoardModel {
   }
 
   private buildFrame(): void {
-    const geometry = new BoxGeometry(
-      SQUARE_SIZE_M * 8 + 0.02,
-      0.008,
-      SQUARE_SIZE_M * 8 + 0.02,
-    )
-    const material = this.materials.boardFrame()
-    const frame = new Mesh(geometry, material)
+    const span = SQUARE_SIZE_M * 8 + FRAME_WIDTH_M * 2
+    const thickness = 0.018
+    const top = BOARD_SURFACE_Y - 0.001
+    const geometry = new BoxGeometry(span, thickness, span)
+    const frame = new Mesh(geometry, this.materials.boardFrame())
     frame.name = 'board-frame'
-    frame.position.y = BOARD_SURFACE_Y - SQUARE_THICKNESS_M - 0.004
+    frame.position.y = top - thickness / 2
     frame.receiveShadow = true
     this.object.add(frame)
+    this.geometries.push(geometry)
+    this.buildInlay(span)
+    this.buildCoordinates(span, top)
+  }
+
+  /** 2 mm grid, heavier inner rectangle, and the outer gold lip. One draw. */
+  private buildInlay(span: number): void {
+    const parts: BoxGeometry[] = []
+    const play = SQUARE_SIZE_M * 8
+    const y = BOARD_SURFACE_Y - 0.00015 - 0.0006
+    for (let index = 1; index <= 7; index += 1) {
+      const at = (index - 4) * SQUARE_SIZE_M
+      parts.push(bar(play, INLAY_WIDTH_M, at, y, 0, true))
+      parts.push(bar(play, INLAY_WIDTH_M, 0, y, at, false))
+    }
+    const inner = 0.0028
+    parts.push(bar(play + inner, inner, 0, y, play / 2, false))
+    parts.push(bar(play + inner, inner, 0, y, -play / 2, false))
+    parts.push(bar(play + inner, inner, play / 2, y, 0, true))
+    parts.push(bar(play + inner, inner, -play / 2, y, 0, true))
+    const lip = 0.004
+    const lipY = BOARD_SURFACE_Y - 0.0016
+    const outer = span / 2 - lip / 2
+    parts.push(bar(span, lip, 0, lipY, outer, false))
+    parts.push(bar(span, lip, 0, lipY, -outer, false))
+    parts.push(bar(span, lip, outer, lipY, 0, true))
+    parts.push(bar(span, lip, -outer, lipY, 0, true))
+    const geometry = mergeBufferGeometries(parts)
+    for (const part of parts) part.dispose()
+    if (!geometry) throw new Error('gold board merge failed')
+    const mesh = new Mesh(geometry, this.materials.gold())
+    mesh.name = 'board-inlay'
+    mesh.receiveShadow = true
+    mesh.castShadow = false
+    mesh.raycast = () => undefined
+    this.object.add(mesh)
     this.geometries.push(geometry)
   }
 
   private buildSquares(): void {
+    const tileSize = SQUARE_SIZE_M * 0.96
+    const proxyGeometry = new BoxGeometry(tileSize, SQUARE_THICKNESS_M, tileSize)
+    this.geometries.push(proxyGeometry)
+    const lightParts: BoxGeometry[] = []
+    const darkParts: BoxGeometry[] = []
     for (let rank = 0; rank < 8; rank += 1) {
       for (let file = 0; file < 8; file += 1) {
         const square = { file, rank }
-        // a8 (file 0, rank 0 in this board's index) is a light square, matching the existing board.
         const light = (file + rank) % 2 === 0
         const material = this.materials.boardSquare(light ? 'light' : 'dark')
-        const geometry = new BoxGeometry(
-          SQUARE_SIZE_M * 0.96,
-          SQUARE_THICKNESS_M,
-          SQUARE_SIZE_M * 0.96,
-        )
-        const mesh = new Mesh(geometry, material)
+        const proxy = new Mesh(proxyGeometry, material)
         const center = squareCenter(square)
-        mesh.position.set(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
-        mesh.name = `square-${file}-${rank}`
-        mesh.receiveShadow = true
-        mesh.userData.msRole = 'square'
-        mesh.userData.msSquare = { file, rank }
-        this.object.add(mesh)
+        proxy.position.set(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
+        proxy.name = `square-${file}-${rank}`
+        proxy.visible = false
+        proxy.userData.msRole = 'square'
+        proxy.userData.msSquare = { file, rank }
+        this.object.add(proxy)
         const key = squareKey(square)
-        this.squares.set(key, mesh)
+        this.squares.set(key, proxy)
         this.baseMaterials.set(key, material)
-        this.geometries.push(geometry)
+        const tile = new BoxGeometry(tileSize, SQUARE_THICKNESS_M, tileSize)
+        mapSquareUv(tile, file, rank)
+        tile.translate(center.x, center.y - SQUARE_THICKNESS_M / 2, center.z)
+        ;(light ? lightParts : darkParts).push(tile)
       }
     }
+    this.addMerged('board-light', lightParts, this.materials.boardSquare('light'))
+    this.addMerged('board-dark', darkParts, this.materials.boardSquare('dark'))
   }
+
+  private addMerged(name: string, parts: BoxGeometry[], material: HallMaterial): void {
+    const geometry = mergeBufferGeometries(parts)
+    for (const part of parts) part.dispose()
+    if (!geometry) throw new Error(`${name} merge failed`)
+    const mesh = new Mesh(geometry, material)
+    mesh.name = name
+    mesh.receiveShadow = true
+    mesh.castShadow = false
+    mesh.raycast = () => undefined
+    this.object.add(mesh)
+    this.geometries.push(geometry)
+  }
+
+  /**
+   * a–h and 1–8 in the frame band.
+   * a is -X. Rank 1 is on white's near edge (+Z).
+   */
+  private buildCoordinates(span: number, frameTop: number): void {
+    const band = FRAME_WIDTH_M
+    const fraction = band / span
+    const y = frameTop + 0.0002
+    this.addCoordBand('board-coordinates-near', span, band, 0, y, span / 2 - band / 2, (uv) => {
+      uv.setY(0, fraction)
+      uv.setY(1, fraction)
+      uv.setY(2, 0)
+      uv.setY(3, 0)
+    })
+    this.addCoordBand('board-coordinates-far', span, band, 0, y, -span / 2 + band / 2, (uv) => {
+      uv.setY(0, 1)
+      uv.setY(1, 1)
+      uv.setY(2, 1 - fraction)
+      uv.setY(3, 1 - fraction)
+    })
+    this.addCoordBand('board-coordinates-left', band, span, -span / 2 + band / 2, y, 0, (uv) => {
+      uv.setX(0, 0)
+      uv.setX(1, fraction)
+      uv.setX(2, 0)
+      uv.setX(3, fraction)
+    })
+    this.addCoordBand('board-coordinates-right', band, span, span / 2 - band / 2, y, 0, (uv) => {
+      uv.setX(0, 1 - fraction)
+      uv.setX(1, 1)
+      uv.setX(2, 1 - fraction)
+      uv.setX(3, 1)
+    })
+  }
+
+  /** One frame-band strip. The playing squares are not covered, so they are shaded once. */
+  private addCoordBand(
+    name: string,
+    width: number,
+    height: number,
+    x: number,
+    y: number,
+    z: number,
+    remap: (uv: BufferAttribute) => void,
+  ): void {
+    const geometry = new PlaneGeometry(width, height)
+    remap(geometry.getAttribute('uv') as BufferAttribute)
+    const plane = new Mesh(geometry, this.materials.coords())
+    plane.name = name
+    plane.rotation.x = -Math.PI / 2
+    plane.position.set(x, y, z)
+    plane.raycast = () => undefined
+    this.object.add(plane)
+    this.geometries.push(geometry)
+  }
+}
+
+/** Puts one square into its cell of the 8×8 baked marble atlas. */
+function mapSquareUv(geometry: BoxGeometry, file: number, rank: number): void {
+  const uv = geometry.getAttribute('uv')
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setXY(index, (file + uv.getX(index)) / 8, (rank + uv.getY(index)) / 8)
+  }
+}
+
+function bar(length: number, width: number, x: number, y: number, z: number, alongZ: boolean): BoxGeometry {
+  const geometry = alongZ ? new BoxGeometry(width, 0.0012, length) : new BoxGeometry(length, 0.0012, width)
+  geometry.translate(x, y, z)
+  return geometry
 }

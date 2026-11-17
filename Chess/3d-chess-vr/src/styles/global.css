@@ -1,3 +1,19 @@
+:root {
+  --hud-bg: #0e0e10;
+  --hud-bg-alpha: rgba(14, 14, 16, 0.9);
+  --hud-border: #c9a44c;
+  --hud-text: #f3efe6;
+  --hud-gold: #d4af37;
+  --hud-gold-soft: #c9a44c;
+  --hud-copper: #c47a42;
+  --hud-focus: #e8d48a;
+  --hud-disabled: #8a847a;
+  --hud-button-bg: #1a1a1c;
+  --hud-button-text: #f3efe6;
+  --hud-page-bg: #070605;
+  --hud-status: #e8d9b0;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -6,8 +22,8 @@ html,
 body {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  background: #1b140f;
-  color: #f4efe4;
+  background: var(--hud-page-bg);
+  color: var(--hud-text);
 }
 
 .hall-page {
@@ -26,6 +42,19 @@ body {
   border: 0;
 }
 
+.hall-column {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.9rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  max-width: 22rem;
+  margin: 0;
+}
+
 .hall-page h1,
 .hall-lead,
 .hall-hud,
@@ -33,16 +62,74 @@ body {
 .hall-actions,
 .hall-panel,
 .hall-meta {
-  position: relative;
+  position: absolute;
   z-index: 2;
-  margin: 0.4rem 1rem;
+  margin: 0;
+}
+
+.hall-column .hall-title,
+.hall-column .hall-meta,
+.hall-column .hall-hud,
+.hall-column .hall-lead,
+.hall-column .hall-tour {
+  position: static;
+}
+
+.hall-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: rgba(14, 14, 16, 0.55);
+  color: #f6f1e6;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.hall-meta {
+  background: rgba(14, 14, 16, 0.55);
+  border: none;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 1.05rem;
+  color: #f6f1e6;
+}
+
+.hall-hud {
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: 16rem;
+  font-size: 0.95rem;
+}
+
+.hall-lead {
+  max-width: 22rem;
+  font-size: 0.85rem;
+}
+
+.hall-actions {
+  top: 8.2rem;
+  right: 0.9rem;
+  left: auto;
+  bottom: auto;
+  background: transparent;
+  border: none;
+  padding: 0;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.hall-tour,
+.hall-panel {
+  top: 6rem;
+  left: 0.9rem;
+  max-width: 24rem;
 }
 
 .hall-hud,
 .hall-tour,
 .hall-panel {
-  background: rgba(28, 20, 14, 0.88);
-  border: 1px solid #8a6a45;
+  background: var(--hud-bg-alpha);
+  border: 1px solid var(--hud-border);
   border-radius: 8px;
   padding: 0.6rem 0.8rem;
 }
@@ -51,6 +138,56 @@ body {
   display: flex;
   gap: 1.2rem;
   flex-wrap: wrap;
+}
+
+.hall-lead {
+  background: var(--hud-bg-alpha);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+}
+
+.hall-meta,
+.hall-turn {
+  color: var(--hud-status);
+}
+
+.hall-clock-active {
+  color: var(--hud-gold);
+  box-shadow: inset 0 -2px 0 var(--hud-gold);
+}
+
+.hall-clock-provisional {
+  color: #1a120c;
+  background: #e8d4b0;
+  border-radius: 4px;
+  padding: 0 0.35rem;
+  box-shadow: none;
+}
+
+.hall-clock-flag {
+  color: #fff7f5;
+  background: #1a0505;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 2px #ffd0cc;
+}
+
+.hall-clock-flag-offline {
+  color: #2a0906;
+  background: #f2c2a0;
+  box-shadow: inset 0 0 0 2px #2a0906;
+}
+
+.hall-clock-low {
+  color: #ffc9a0;
+  box-shadow: inset 0 -3px 0 #ffc9a0;
+}
+
+.hall-turn-black {
+  color: var(--hud-copper);
 }
 
 .hall-actions,
@@ -65,12 +202,70 @@ body {
 .hall-panel button,
 .hall-tour button {
   font: inherit;
-  background: #6a4428;
-  color: #f4efe4;
-  border: 1px solid #c9a227;
+  font-size: 0.78rem;
+  background: var(--hud-button-bg);
+  color: var(--hud-button-text);
+  border: 1px solid var(--hud-gold-soft);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.hall-actions button:focus-visible,
+.hall-panel button:focus-visible,
+.hall-tour button:focus-visible {
+  outline: 2px solid var(--hud-focus);
+  outline-offset: 2px;
+}
+
+.hall-actions button:disabled,
+.hall-panel button:disabled,
+.hall-tour button:disabled,
+.hall-actions button[aria-disabled='true'],
+.hall-panel button[aria-disabled='true'],
+.hall-tour button[aria-disabled='true'] {
+  color: var(--hud-disabled);
+  border-color: var(--hud-disabled);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.hall-lichess {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  z-index: 2;
+  max-width: 16rem;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  background: rgba(14, 14, 16, 0.82);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  text-align: right;
+}
+
+.hall-lichess p {
+  margin: 0 0 0.35rem;
+}
+
+.hall-lichess a {
+  color: #f0d78a;
+}
+
+.hall-lichess-signin,
+.hall-lichess button {
+  font: inherit;
+  font-size: 0.82rem;
+  color: #1a1208;
+  background: #e8c56a;
+  border: 1px solid #f0d78a;
   border-radius: 6px;
   padding: 0.35rem 0.7rem;
   cursor: pointer;
+}
+
+.hall-lichess button + button {
+  margin-left: 0.4rem;
 }
 
 .hall-stage {

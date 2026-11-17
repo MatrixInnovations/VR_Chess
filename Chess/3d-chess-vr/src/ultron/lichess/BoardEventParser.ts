@@ -65,15 +65,25 @@ export class BoardEventParser {
 
   private gameFull(record: Record<string, unknown>): ParsedLine {
     const id = this.stringField(record.id);
-    const white = this.playerId(record.white);
-    const black = this.playerId(record.black);
+    const white = this.playerFace(record.white);
+    const black = this.playerFace(record.black);
     const variant = this.variantOf(record.variant);
     const state = this.stateOf(record.state);
     if (!id || !white || !black || !variant || !state) return { kind: 'invalid' };
     const initialFen = this.stringField(record.initialFen) ?? 'startpos';
     return {
       kind: 'board',
-      event: { type: 'gameFull', id, initialFen, variant, whiteId: white, blackId: black, state },
+      event: {
+        type: 'gameFull',
+        id,
+        initialFen,
+        variant,
+        whiteId: white.id,
+        blackId: black.id,
+        white,
+        black,
+        state,
+      },
     };
   }
 
@@ -157,9 +167,24 @@ export class BoardEventParser {
     return key as VariantKey;
   }
 
-  private playerId(value: unknown): string | null {
+  private playerFace(value: unknown): import('./apiTypes').SeatFace | null {
     if (!value || typeof value !== 'object') return null;
-    return this.stringField((value as Record<string, unknown>).id);
+    const record = value as Record<string, unknown>;
+    const id = this.stringField(record.id);
+    if (!id) return null;
+    const aiLevel = typeof record.aiLevel === 'number' ? record.aiLevel : null;
+    const ai = aiLevel !== null;
+    const name = ai
+      ? `Stockfish level ${aiLevel}`
+      : this.stringField(record.name) ?? this.stringField(record.username) ?? id;
+    return {
+      id,
+      name,
+      title: this.stringField(record.title),
+      rating: typeof record.rating === 'number' ? record.rating : null,
+      ai,
+      aiLevel,
+    };
   }
 
   private stringField(value: unknown): string | null {

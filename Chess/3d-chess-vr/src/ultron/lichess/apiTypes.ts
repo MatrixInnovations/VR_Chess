@@ -69,6 +69,16 @@ export interface GameStatePayload {
   readonly btakeback?: boolean;
 }
 
+/** One seat on a Lichess game, enough for the opponent card. */
+export interface SeatFace {
+  readonly id: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly rating: number | null;
+  readonly ai: boolean;
+  readonly aiLevel?: number | null;
+}
+
 /** Events from `GET /api/board/game/stream/{gameId}`. */
 export type BoardGameEvent =
   | {
@@ -78,6 +88,8 @@ export type BoardGameEvent =
       readonly variant: VariantKey;
       readonly whiteId: string;
       readonly blackId: string;
+      readonly white?: SeatFace;
+      readonly black?: SeatFace;
       readonly state: GameStatePayload;
     }
   | { readonly type: 'gameState'; readonly state: GameStatePayload }
