@@ -240,6 +240,24 @@ describe('ChessApplication pass and play', () => {
     )
     expect(hall.shell.authPresenter.snapshot().phase).toBe('denied')
   })
+
+  it('shows a cancelled sign-in even when no Lichess client id is configured', async () => {
+    const storage = new MemoryKeyValueStore()
+    storage.set('ultron.oauth.transaction', JSON.stringify({ verifier: 'stale', state: 'abc' }))
+    const hall = new ChessApplication({
+      xr: new FakeXr(),
+      whiteMs: 60_000,
+      blackMs: 60_000,
+      incrementMs: 0,
+      transport: new DeadTransport(),
+      storage,
+    })
+    await hall.completeRedirectIfPresent('https://play.example/?error=access_denied&state=abc')
+    expect(hall.shell.authPresenter.snapshot().message).toBe(
+      'Lichess sign-in was cancelled. You can try again anytime.',
+    )
+    expect(storage.get('ultron.oauth.transaction')).toBeNull()
+  })
 })
 
 class ScriptFactory implements SpeechRecognitionFactory {
