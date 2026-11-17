@@ -4,7 +4,6 @@ import {
   Color,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PlaneGeometry,
   PMREMGenerator,
   Scene,
@@ -13,18 +12,19 @@ import {
 } from 'three'
 
 /**
- * Dark hall with warm softboxes. Built in JS so the page never fetches an HDR.
+ * Studio cube for the metals. Built in JS so the page never fetches an HDR.
+ * A bright ceiling softbox over a dark room gives highlights and dark sides.
  * MeshBasicMaterial colours above 1 become radiance in the PMREM pass.
  */
 export function darkHallEnvScene(): Scene {
   const scene = new Scene()
   const room = new Mesh(
-    new BoxGeometry(12, 6, 12),
-    new MeshStandardMaterial({ color: 0x0b0a09, roughness: 1, side: BackSide }),
+    new BoxGeometry(10, 8, 10),
+    new MeshBasicMaterial({ color: 0x0c0b0a, side: BackSide }),
   )
-  room.position.y = 2.5
+  room.position.y = 2.2
   scene.add(room)
-  const box = (
+  const panel = (
     width: number,
     height: number,
     kelvin: [number, number, number],
@@ -38,14 +38,12 @@ export function darkHallEnvScene(): Scene {
       new MeshBasicMaterial({ color: new Color(kelvin[0], kelvin[1], kelvin[2]).multiplyScalar(power) }),
     )
     light.position.set(x, y, z)
-    light.lookAt(0, 0.8, 0)
+    light.lookAt(0, 1.1, 0)
     scene.add(light)
   }
-  box(3.2, 1.4, [1, 0.9, 0.75], 16, 0.2, 3.4, 0.6)
-  box(2.0, 1.2, [1, 0.82, 0.62], 12, 1.6, 3.0, 1.2)
-  box(1.2, 0.8, [1, 0.86, 0.7], 8, -2.2, 2.2, -1.0)
-  box(3.0, 0.25, [1, 0.78, 0.5], 10, 0, 3.6, -2.5)
-  box(1.4, 0.7, [0.9, 0.92, 1], 7, -1.0, 1.4, 2.6)
+  panel(5.5, 3.4, [1, 0.97, 0.9], 22, 0, 4.8, 0.1)
+  panel(2.6, 1.8, [1, 0.84, 0.68], 12, 1.6, 2.8, 2.2)
+  panel(1.8, 2.4, [0.72, 0.8, 1], 5, -2.6, 2.0, 1.4)
   return scene
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { expectProbePainted, waitForHallCanvas } from './hallCanvas'
+import { expectPiecesShaded, expectProbePainted, waitForHallCanvas } from './hallCanvas'
 
 test('production build serves the hall without the debug hook', async ({ page }) => {
   const violations: string[] = []
@@ -19,5 +19,6 @@ test('production build serves the hall without the debug hook', async ({ page })
   expect(hook).toBeUndefined()
   await waitForHallCanvas(page)
   await expectProbePainted(page)
+  await expectPiecesShaded(page)
   expect(violations).toEqual([])
 })

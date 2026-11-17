@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { expectProbePainted, waitForHallCanvas } from './hallCanvas'
+import { expectPiecesShaded, expectProbePainted, waitForHallCanvas } from './hallCanvas'
 
 async function waitForNextFrame(page: Page): Promise<void> {
   const before = await page.locator('canvas').getAttribute('data-frames')
@@ -46,4 +46,5 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await expect(page.getByTestId('session-id')).toHaveText(before)
   await expect(page.getByTestId('clock-active')).toHaveText('black')
   await expectProbePainted(page)
+  await expectPiecesShaded(page)
 })

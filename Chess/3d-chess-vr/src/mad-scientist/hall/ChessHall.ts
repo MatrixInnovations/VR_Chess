@@ -105,8 +105,8 @@ export class ChessHall {
   /** Hero framing for the desktop shot. XR keeps the seated eye. */
   frameDesktop(): void {
     this.camera.fov = 40
-    this.camera.position.set(0, 1.06, 0.47)
-    this.camera.lookAt(0, 0.76, -0.09)
+    this.camera.position.set(0, 1.1, 0.6)
+    this.camera.lookAt(0, 0.78, -0.04)
     this.camera.updateProjectionMatrix()
   }
 
@@ -362,10 +362,13 @@ export class ChessHall {
     ]
     for (const board of baseboards) {
       this.addBox(board.name, board.size, board.position, this.materials.gold(), room, false)
+      const mesh = room.getObjectByName(board.name)
+      if (mesh) mesh.visible = false
     }
 
     const windowFrame = new Group()
     windowFrame.name = 'window-frame'
+    windowFrame.visible = false
     room.add(windowFrame)
     this.addBox(
       'window-trim',

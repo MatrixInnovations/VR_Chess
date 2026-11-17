@@ -110,8 +110,7 @@ body {
 
 .hall-hud,
 .hall-tour,
-.hall-panel,
-.site-credit {
+.hall-panel {
   background: var(--hud-bg-alpha);
   border: 1px solid var(--hud-border);
   border-radius: 8px;
@@ -188,8 +187,7 @@ body {
 
 .hall-actions button:focus-visible,
 .hall-panel button:focus-visible,
-.hall-tour button:focus-visible,
-.site-credit a:focus-visible {
+.hall-tour button:focus-visible {
   outline: 2px solid var(--hud-focus);
   outline-offset: 2px;
 }
@@ -230,32 +228,4 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.site-credit {
-  position: fixed;
-  left: 50%;
-  bottom: 0.55rem;
-  z-index: 3;
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 0.35rem 0.75rem;
-  max-width: calc(100% - 1.5rem);
-  text-align: center;
-  font-size: 0.82rem;
-  line-height: 1.35;
-  pointer-events: none;
-  border-radius: 6px;
-}
-
-.site-credit p {
-  margin: 0;
-}
-
-.site-credit-name {
-  color: var(--hud-gold);
-}
-
-.site-credit a {
-  pointer-events: auto;
 }

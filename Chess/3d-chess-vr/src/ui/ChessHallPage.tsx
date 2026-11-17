@@ -11,8 +11,7 @@ import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
 import { BOARD_SURFACE_Y, SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
 import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
-import { publishFrameSample, readCenterProbe, type FrameProbe } from './frameSample'
-import { SiteCredit } from './SiteCredit'
+import { publishFrameSample, readCenterProbe, readLuminanceStats, type FrameProbe, type PieceLuminance } from './frameSample'
 
 const boardProbePoint = new Vector3()
 
@@ -223,7 +222,6 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           )}
         </Canvas> : null}
       </div>
-      <SiteCredit />
     </main>
   )
 }
@@ -280,6 +278,14 @@ function HallTicker({ model }: { model: ChessApplication }): null {
       boardProbePoint.project(state.camera)
       const sample = readCenterProbe(state.gl, { x: boardProbePoint.x, y: boardProbePoint.y })
       if (sample) (window as Window & { __CHESS_FRAME_PROBE__?: FrameProbe }).__CHESS_FRAME_PROBE__ = sample
+      const king = model.runtime.hall.getPiece('white-king')
+      if (king) {
+        king.object.getWorldPosition(boardProbePoint)
+        boardProbePoint.y += 0.042
+        boardProbePoint.project(state.camera)
+        const shade = readLuminanceStats(state.gl, { x: boardProbePoint.x, y: boardProbePoint.y }, 32)
+        if (shade) (window as Window & { __CHESS_PIECE_PROBE__?: PieceLuminance }).__CHESS_PIECE_PROBE__ = shade
+      }
     }
     publishFrameSample(state.gl, presenting)
   }, 1)

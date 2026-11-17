@@ -248,7 +248,8 @@ describe('hall stage', () => {
       bake: () => ({ texture: environment }),
     })
     expect(hall.camera.fov).toBe(40)
-    expect(hall.camera.position.z).toBeCloseTo(0.47)
+    expect(hall.camera.position.y).toBeCloseTo(1.1)
+    expect(hall.camera.position.z).toBeCloseTo(0.6)
     expect(hall.reflector).toBeNull()
     expect(hall.grade).toBeTruthy()
     const bloom = (hall.grade as unknown as { passes: { strength?: number; threshold?: number }[] }).passes[1]

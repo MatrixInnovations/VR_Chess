@@ -24,7 +24,6 @@ import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 import { bakeMarbleGpu } from './MarbleVeins'
 import { buildEnvironment, darkHallEnvScene } from './HallEnvironment'
 import type { ChessHall } from './ChessHall'
-import { BOARD_SURFACE_Y } from './metrics'
 
 /** Same-origin CC0 studio HDR. See public/brown_photostudio_02_LICENSE.txt. */
 export const STUDIO_HDR_URL = '/brown_photostudio_02_1k.hdr'
@@ -74,7 +73,7 @@ export function configureHallStage(
     hall.frameDesktop()
     scene.fog = new FogExp2(0x0b0908, 0.045)
     const controls = new OrbitControls(camera, gl.domElement)
-    controls.target.set(0, BOARD_SURFACE_Y, -0.09)
+    controls.target.set(0, 0.78, -0.04)
     controls.minDistance = 0.55
     controls.maxDistance = 1.25
     controls.minPolarAngle = 0.45

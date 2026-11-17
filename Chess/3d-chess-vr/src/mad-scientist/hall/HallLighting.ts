@@ -107,8 +107,8 @@ export class HallLighting {
    */
   setTier(tier: 'desktop' | 'quest'): void {
     const desktop = tier === 'desktop'
-    this.hemisphere.intensity = desktop ? 0.5 : 0.36
-    this.key.intensity = desktop ? 1.75 : 1.05
+    this.hemisphere.intensity = desktop ? 1.4 : 0.36
+    this.key.intensity = desktop ? 8 : 1.05
     this.key.shadow.mapSize.set(512, 512)
     this.key.shadow.normalBias = desktop ? 0.012 : 0.01
     const span = desktop ? 0.7 : 0.6

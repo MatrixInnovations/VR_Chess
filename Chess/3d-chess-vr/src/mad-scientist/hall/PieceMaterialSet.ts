@@ -3,7 +3,6 @@ import {
   MeshBasicMaterial,
   MeshLambertMaterial,
   MeshStandardMaterial,
-  MixOperation,
   Texture,
 } from 'three'
 
@@ -40,15 +39,13 @@ const TEXTURE_SLOTS = [
   'envMap',
 ] as const
 
-const METAL_KEYS = [
+const PIECE_KEYS = [
   'white:idle',
   'black:idle',
   'white:selected',
   'black:selected',
   'white:dragging',
   'black:dragging',
-  'board:gold',
-  'room:trim',
 ] as const
 
 /** Stone and cloth stay cheap. Metals keep a reflection map. */
@@ -86,25 +83,17 @@ export class PieceMaterialSet {
       base: [10, 10, 11],
     }))
     floorTile.repeat.set(4, 4)
-    const wallTile = this.keep(bakeMarble({
-      size: Math.max(64, size / 2),
-      dark: true,
-      veinMix: 0.25,
-      cells: 1,
-      base: [12, 11, 10],
-    }))
-    wallTile.repeat.set(1.5, 1.5)
     const glyphs = this.keep(coordinateBorderTexture())
 
-    this.put('white:idle', this.metal(0xd4d7dc, 0.08, 0, 0, 1, 0, 0.04, 1.6))
-    this.put('black:idle', this.metal(0xc06a38, 0.08, 0, 0, 1, 0, 0.05, 2))
-    this.put('white:selected', this.metal(0xd4d7dc, 0.08, 0xc9a44c, 0.12, 1, 0, 0.04, 1.6))
-    this.put('black:selected', this.metal(0xc06a38, 0.08, 0xc9a44c, 0.12, 1, 0, 0.05, 2))
-    this.put('white:dragging', this.metal(0xd4d7dc, 0.08, 0, 0, 0.7, 0, 0.04, 1.6))
-    this.put('black:dragging', this.metal(0xc06a38, 0.08, 0, 0, 0.7, 0, 0.05, 2))
+    this.put('white:idle', this.metal(0xd4d7dc, 0.2, 0, 0, 1, 1.15, true))
+    this.put('black:idle', this.metal(0xc06a38, 0.2, 0, 0, 1, 1.35, true))
+    this.put('white:selected', this.metal(0xd4d7dc, 0.2, 0xc9a44c, 0.12, 1, 1.15, true))
+    this.put('black:selected', this.metal(0xc06a38, 0.2, 0xc9a44c, 0.12, 1, 1.35, true))
+    this.put('white:dragging', this.metal(0xd4d7dc, 0.2, 0, 0, 0.7, 1.15, true))
+    this.put('black:dragging', this.metal(0xc06a38, 0.2, 0, 0, 0.7, 1.35, true))
     for (const finish of ['idle', 'selected', 'dragging'] as const) {
       const black = this.get('black', finish)
-      if (black instanceof MeshStandardMaterial) black.metalness = 0.8
+      if (black instanceof MeshStandardMaterial) black.metalness = 0.85
     }
 
     this.put('board:light', this.marble(lightAtlas, 0.16, 0.95, 0.08, 0.4, true))
@@ -123,7 +112,7 @@ export class PieceMaterialSet {
         polygonOffset: true,
       }),
     )
-    this.put('board:gold', this.metal(0xc9a44c, 0.18, 0, 0, 1, 0.15, 0.12, 1.85))
+    this.put('board:gold', this.metal(0xc9a44c, 0.18, 0, 0, 1, 1))
     this.put(
       'board:coords',
       this.make({
@@ -151,9 +140,9 @@ export class PieceMaterialSet {
 
     this.put('room:floor', this.marble(floorTile, 0.5, 0, 0.22, 0.35, true))
     this.put('room:table', this.marble(floorTile, 0.45, 0, 0.22, 0.12, true))
-    this.put('room:wall', this.marble(wallTile, 0.62, 0, 0.3, 0.45, true))
-    this.put('room:plaster', this.marble(wallTile, 0.62, 0, 0.3, 0.45, true))
-    this.put('room:ceiling', this.make({ color: 0x0c0b0a, roughness: 0.7, metalness: 0, clearcoat: 0.05, clearcoatRoughness: 0.6, envMapIntensity: 0.4, unlit: true }))
+    this.put('room:wall', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:plaster', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:ceiling', this.make({ color: 0x070605, roughness: 1, metalness: 0, unlit: true }))
     this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
     this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35 }))
     this.put('room:leg', this.make({ color: 0x141210, roughness: 0.35, metalness: 0.05, clearcoat: 0.2, clearcoatRoughness: 0.35, envMapIntensity: 0.8 }))
@@ -170,7 +159,7 @@ export class PieceMaterialSet {
         envMapIntensity: 0.8,
       }),
     )
-    this.put('room:trim', this.metal(0xc9a44c, 0.22, 0, 0, 1, 0.15, 0.15, 1.6))
+    this.put('room:trim', this.metal(0xc9a44c, 0.22, 0, 0, 1, 1))
   }
 
   /** The shared material for `color` and `finish`. */
@@ -300,7 +289,7 @@ export class PieceMaterialSet {
   bindReflections(texture: Texture): void {
     if (this.reflection && this.reflection !== texture) this.reflection.dispose()
     this.reflection = texture
-    for (const key of METAL_KEYS) {
+    for (const key of PIECE_KEYS) {
       const material = this.table.get(key) as MeshStandardMaterial
       material.envMap = texture
       material.needsUpdate = true
@@ -386,27 +375,23 @@ export class PieceMaterialSet {
     emissive = 0,
     emissiveIntensity = 0,
     opacity = 1,
-    clearcoat = 0,
-    clearcoatRoughness = 0.06,
     envMapIntensity = 1,
+    shaded = false,
   ): HallMaterial {
-    if (emissiveIntensity <= 0) {
+    if (!shaded) {
       return new MeshBasicMaterial({
         color,
         transparent: opacity < 1,
         opacity,
-        reflectivity: 0.3,
-        combine: MixOperation,
       })
     }
-    return this.make({
+    return new MeshStandardMaterial({
       color,
       roughness,
       metalness: 1,
-      clearcoat,
-      clearcoatRoughness,
       emissive,
       emissiveIntensity,
+      transparent: opacity < 1,
       opacity,
       envMapIntensity,
     })
