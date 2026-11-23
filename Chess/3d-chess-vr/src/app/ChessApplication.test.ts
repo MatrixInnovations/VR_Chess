@@ -239,6 +239,7 @@ describe('ChessApplication pass and play', () => {
       'Lichess sign-in was cancelled. You can try again anytime.',
     )
     expect(hall.shell.authPresenter.snapshot().phase).toBe('denied')
+    expect(hall.shell.navigator.screen.name).not.toBe('sign-in')
   })
 
   it('shows a cancelled sign-in even when no Lichess client id is configured', async () => {

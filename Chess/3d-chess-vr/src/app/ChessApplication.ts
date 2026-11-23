@@ -640,6 +640,8 @@ export class ChessApplication {
     if (!code && !denied) return
     await this.shell.signIn.complete(href)
     if (typeof history !== 'undefined') history.replaceState(null, '', `${url.pathname}${url.hash}`)
+    // A cancelled sign-in is told by the Lichess dock. The left panel would sit on the clock and the tour.
+    if (this.shell.authPresenter.snapshot().phase === 'denied') this.shell.navigator.showBoard(this.viewPort)
     this.bump()
   }
 

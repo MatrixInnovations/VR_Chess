@@ -8,11 +8,21 @@ const store = {
   onSessionEnd: (listener: () => void) => listener,
 }
 
+const created: Array<Record<string, unknown>> = []
+
 vi.mock('@react-three/xr', () => ({
-  createXRStore: () => store,
+  createXRStore: (options: Record<string, unknown>) => {
+    created.push(options)
+    return store
+  },
 }))
 
-import { WebXrHallSession } from './WebXrHallSession'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { WebXrHallSession, xrProfilesBase, XR_PROFILES_PATH } from './WebXrHallSession'
+
+const publicDir = join(__dirname, '..', '..', 'public')
 
 describe('WebXrHallSession', () => {
   it('enters and leaves VR, and reports a missing session', async () => {
@@ -45,5 +55,33 @@ describe('WebXrHallSession', () => {
     expect(ended).toBe(0)
     const emulate = new WebXrHallSession(() => '?xr=1')
     expect(emulate.store).toBeTruthy()
+  })
+
+  it('loads controller layouts and hand models from this origin, not the blocked CDN', () => {
+    created.length = 0
+    void new WebXrHallSession(() => '').store
+    const base = created[0]?.baseAssetPath
+    expect(typeof base).toBe('string')
+    expect(new URL(String(base)).origin).toBe(new URL(xrProfilesBase()).origin)
+    expect(String(base).endsWith(XR_PROFILES_PATH)).toBe(true)
+    expect(xrProfilesBase('https://vr-chess-hall.netlify.app')).toBe('https://vr-chess-hall.netlify.app/xr-input-profiles/')
+  })
+
+  it('ships every profile and model the Quest controllers and hands ask for', () => {
+    const root = join(publicDir, 'xr-input-profiles')
+    const list = JSON.parse(readFileSync(join(root, 'profilesList.json'), 'utf8')) as Record<string, { path: string }>
+    for (const id of ['meta-quest-touch-pro', 'meta-quest-touch-plus', 'oculus-touch-v3', 'oculus-touch-v2', 'generic-trigger', 'generic-hand']) {
+      expect(list[id], id).toBeDefined()
+    }
+    for (const entry of Object.values(list)) {
+      const profilePath = join(root, entry.path)
+      expect(existsSync(profilePath), profilePath).toBe(true)
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as { layouts: Record<string, { assetPath?: string }> }
+      for (const layout of Object.values(profile.layouts)) {
+        if (layout.assetPath) expect(existsSync(join(profilePath, '..', layout.assetPath)), layout.assetPath).toBe(true)
+      }
+    }
+    expect(existsSync(join(root, 'generic-hand', 'left.glb'))).toBe(true)
+    expect(existsSync(join(root, 'generic-hand', 'right.glb'))).toBe(true)
   })
 })

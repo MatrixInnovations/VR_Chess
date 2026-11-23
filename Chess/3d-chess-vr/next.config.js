@@ -41,7 +41,8 @@ if (staticExport) {
               `script-src 'self'${devScripts}`,
               `style-src 'self'${devStyles}`,
               "img-src 'self' data: blob:",
-              "connect-src 'self' https://lichess.org",
+              // blob: is where GLTFLoader puts the textures inside the vendored controller and hand models.
+              "connect-src 'self' blob: https://lichess.org",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
             ].join('; '),

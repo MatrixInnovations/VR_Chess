@@ -185,7 +185,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           ))}
         </div>
       ) : null}
-      {screen === 'sign-in' ? <SignInPanel model={model} phase={signIn.phase} url={signIn.authorizationUrl} message={signIn.message} username={signIn.username} /> : null}
+      {screen === 'sign-in' ? <SignInPanel model={model} phase={signIn.phase} url={signIn.authorizationUrl} message={signIn.phase === 'denied' ? null : signIn.message} username={signIn.username} /> : null}
       {screen === 'lobby' ? <LobbyPanel model={model} time={lobby.timeControl} message={lobby.message} /> : null}
       {screen === 'waiting' ? (
         <div className="hall-panel">
