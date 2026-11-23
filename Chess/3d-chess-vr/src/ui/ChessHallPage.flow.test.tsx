@@ -75,11 +75,16 @@ describe('ChessHallPage controls', () => {
     render(<ChessHallPage app={app} />)
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Resign' }))
+    // Resigning closes the menu so the game-over panel is not covered.
+    expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Offer draw' }))
     fireEvent.click(screen.getByRole('button', { name: 'Decline draw' }))
     fireEvent.click(screen.getByRole('button', { name: 'Replay tour' }))
     fireEvent.click(screen.getByRole('button', { name: 'Lichess sign-in' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back to the board' }))
+    // Opening sign-in closed the menu, so open it again for the lobby.
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Lobby' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Back to the board' })[0]!)
     await act(async () => {

@@ -58,3 +58,26 @@ test('dismiss is clickable and a cancelled Lichess sign-in stays on screen', asy
   await expect(page.locator('.hall-lichess').getByText('Lichess sign-in was cancelled. You can try again anytime.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in with Lichess' })).toBeEnabled()
 })
+
+test('menu buttons sit above the clock column and Close shuts the menu', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
+  await page.getByRole('button', { name: 'Menu' }).click()
+  const menu = page.getByRole('dialog', { name: 'Menu' })
+  await expect(menu).toBeVisible()
+  for (const name of ['Close', 'Resign', 'Offer draw']) {
+    const button = menu.getByRole('button', { name })
+    const box = await button.boundingBox()
+    if (!box) throw new Error(`${name} has no box`)
+    const onTop = await page.evaluate(
+      ({ x, y, label }) => {
+        const hit = document.elementFromPoint(x, y)
+        return Boolean(hit?.closest('button')?.textContent?.trim() === label)
+      },
+      { x: box.x + box.width / 2, y: box.y + box.height / 2, label: name },
+    )
+    expect(onTop, `${name} is the top hit`).toBe(true)
+  }
+  await menu.getByRole('button', { name: 'Close' }).click()
+  await expect(menu).toHaveCount(0)
+})

@@ -381,6 +381,7 @@ export class ChessApplication {
    */
   async resign(): Promise<void> {
     const seat = this.session.snapshot.turn
+    this.menu.close()
     await this.session.submit({ kind: 'resign', id: this.ids.next(), source: 'pointer', seat })
     this.bump()
   }
@@ -512,8 +513,9 @@ export class ChessApplication {
     this.bump()
   }
 
-  /** Open the Lichess sign-in screen and redraw. */
+  /** Open the Lichess sign-in screen over a closed menu, so the two panels never stack. */
   openSignIn(): void {
+    this.menu.close()
     this.shell.navigator.showSignIn()
     this.bump()
   }
@@ -558,6 +560,7 @@ export class ChessApplication {
 
   /** Open the lobby from a stored session and redraw. Signed-out players see sign-in. */
   openLobby(): void {
+    this.menu.close()
     this.shell.signIn.continueWithSession()
     if (this.shell.authPresenter.snapshot().phase === 'denied') this.shell.navigator.showSignIn()
     this.bump()

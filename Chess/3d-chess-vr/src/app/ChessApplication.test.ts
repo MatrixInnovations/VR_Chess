@@ -159,6 +159,21 @@ describe('ChessApplication pass and play', () => {
     await hall.retryConnection()
   })
 
+  it('closes the menu when it opens sign-in, the lobby, or resigns', async () => {
+    const { app: hall } = app(() => 0)
+    hall.toggleMenu()
+    hall.openSignIn()
+    expect(hall.menu.isOpen).toBe(false)
+    hall.backToBoard()
+    hall.toggleMenu()
+    hall.openLobby()
+    expect(hall.menu.isOpen).toBe(false)
+    hall.backToBoard()
+    hall.toggleMenu()
+    await hall.resign()
+    expect(hall.menu.isOpen).toBe(false)
+  })
+
   it('advances from performance.now and opens sign-in when the lobby is requested signed out', () => {
     const perf = vi.spyOn(performance, 'now')
     const wall = vi.spyOn(Date, 'now')

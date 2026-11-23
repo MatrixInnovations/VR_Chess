@@ -102,7 +102,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
         <h1 className="hall-title">Chess Hall</h1>
         <p className="hall-meta">
           {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} ·{' '}
-          <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn}</span> to move
+          <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn === 'black' ? 'Black' : 'White'}</span> to move
           {snap.outcome ? ` · ${snap.outcome.status}` : ''}
         </p>
         <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
@@ -114,9 +114,9 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
             Black {formatClockMs(clock.black.remainingMs, clockBlank || !mounted)}
             {clockNote({ ...clock.black, blank: clockBlank })}
           </p>
-          <p data-testid="clock-active" className="hall-sr">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
-          <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
-          <p data-testid="presentation" className="hall-sr">{model.presentation}</p>
+          <p data-testid="clock-active" className="hall-sr" aria-hidden="true">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
+          <p data-testid="session-id" className="hall-sr" aria-hidden="true">{model.game.id}</p>
+          <p data-testid="presentation" className="hall-sr" aria-hidden="true">{model.presentation}</p>
           {model.message ? <p data-testid="status-line">{model.message}</p> : null}
         </section>
         {showIntro ? (
@@ -379,6 +379,18 @@ function MenuPanel({ model }: { model: ChessApplication }): ReactElement {
   )
 }
 
+const SIGN_IN_STATUS: Record<string, string> = {
+  'signed-out': 'Not signed in yet.',
+  redirecting: 'Opening Lichess…',
+  'signed-in': 'Signed in to Lichess.',
+  denied: 'Sign-in was cancelled.',
+}
+
+/** Words a player reads instead of the presenter's state name. */
+export function signInStatus(phase: string): string {
+  return SIGN_IN_STATUS[phase] ?? 'Checking your Lichess sign-in…'
+}
+
 /**
  * PKCE sign-in. The token is not rendered.
  * @param props - Presenter fields and the application.
@@ -407,7 +419,7 @@ function SignInPanel(props: {
       <button type="button" onClick={() => props.model.backToBoard()}>
         Back to the board
       </button>
-      <p data-testid="sign-in-phase">{props.phase}</p>
+      <p data-testid="sign-in-phase" data-phase={props.phase}>{signInStatus(props.phase)}</p>
     </div>
   )
 }

@@ -125,6 +125,11 @@ body {
   max-width: 24rem;
 }
 
+/* Menu, promotion, sign-in, lobby, waiting, game-over and error panels open over the clock column (z-index 3). */
+.hall-panel {
+  z-index: 4;
+}
+
 .hall-hud,
 .hall-tour,
 .hall-panel {
@@ -200,7 +205,8 @@ body {
 
 .hall-actions button,
 .hall-panel button,
-.hall-tour button {
+.hall-tour button,
+.hall-lead button {
   font: inherit;
   font-size: 0.78rem;
   background: var(--hud-button-bg);
@@ -213,7 +219,8 @@ body {
 
 .hall-actions button:focus-visible,
 .hall-panel button:focus-visible,
-.hall-tour button:focus-visible {
+.hall-tour button:focus-visible,
+.hall-lead button:focus-visible {
   outline: 2px solid var(--hud-focus);
   outline-offset: 2px;
 }
@@ -292,4 +299,23 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Narrow screens: the clock column spans the width, so the actions move to a row along the bottom edge. */
+@media (max-width: 640px) {
+  .hall-actions {
+    top: auto;
+    bottom: 0.9rem;
+    left: 0.9rem;
+    right: 0.9rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    z-index: 4;
+  }
+
+  /* The Lichess dock overlaps the clock column here; keep its button on top. */
+  .hall-lichess {
+    z-index: 4;
+  }
 }
