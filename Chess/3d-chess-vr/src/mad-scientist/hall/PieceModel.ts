@@ -1,17 +1,9 @@
-import {
-  BoxGeometry,
-  BufferGeometry,
-  ConeGeometry,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-} from 'three'
+import { Group, Mesh } from 'three'
 
 import type { PieceColor, PieceFinish, PieceKind, PieceSnapshot, Square, Vec3 } from '../contracts/types'
 import type { BoardModel } from './BoardModel'
-import type { PieceMaterialSet } from './PieceMaterialSet'
+import type { HallMaterial, PieceMaterialSet } from './PieceMaterialSet'
+import { pieceGeometry } from './PieceGeometryCache'
 
 /**
  * One piece on the hall board.
@@ -69,8 +61,8 @@ export class PieceModel {
   }
 
   /** Material currently on the first mesh. */
-  currentMaterial(): MeshStandardMaterial {
-    return this.owned[0].material as MeshStandardMaterial
+  currentMaterial(): HallMaterial {
+    return this.owned[0].material as HallMaterial
   }
 
   /** Swap every mesh onto the shared material for `finish`. */
@@ -90,52 +82,31 @@ export class PieceModel {
   snapToSquare(square: Square): void {
     this.square = { file: square.file, rank: square.rank }
     this.object.position.copy(this.board.worldPosition(this.square))
+    this.aimKnight()
   }
 
-  /** Drop the piece's geometries. Shared materials stay with the set. */
+  /** Both knights on a side turn inward, toward the middle of the board. */
+  private aimKnight(): void {
+    if (this.kind !== 'knight') return
+    const mesh = this.owned[0]
+    if (!mesh) return
+    const inward = this.square.file < 3.5 ? -0.65 : 0.65
+    mesh.rotation.y = this.color === 'white' ? Math.PI / 2 + inward : -(Math.PI / 2 + inward)
+  }
+
+  /**
+   * Detach the piece. The geometry is shared, so this does not dispose it.
+   */
   dispose(): void {
     this.object.removeFromParent()
-    for (const mesh of this.owned) mesh.geometry.dispose()
     this.owned = []
     this.object.clear()
   }
 
   private build(kind: PieceKind): void {
-    const builders: Partial<Record<PieceKind, () => void>> = {
-      pawn: () => {
-        this.add(new CylinderGeometry(0.009, 0.011, 0.02, 12), 0.01)
-        this.add(new SphereGeometry(0.011, 12, 10), 0.026)
-      },
-      rook: () => {
-        this.add(new CylinderGeometry(0.012, 0.013, 0.03, 8), 0.015)
-        this.add(new BoxGeometry(0.02, 0.008, 0.02), 0.032)
-      },
-      knight: () => {
-        this.add(new BoxGeometry(0.014, 0.02, 0.014), 0.01)
-        this.add(new BoxGeometry(0.012, 0.016, 0.02), 0.026)
-      },
-      bishop: () => {
-        this.add(new ConeGeometry(0.012, 0.034, 12), 0.017)
-        this.add(new SphereGeometry(0.006, 10, 8), 0.036)
-      },
-      queen: () => {
-        this.add(new ConeGeometry(0.013, 0.038, 12), 0.019)
-        this.add(new SphereGeometry(0.008, 10, 8), 0.04)
-      },
-      king: () => {
-        this.add(new CylinderGeometry(0.012, 0.014, 0.032, 12), 0.016)
-        this.add(new BoxGeometry(0.004, 0.014, 0.004), 0.038)
-        this.add(new BoxGeometry(0.012, 0.004, 0.004), 0.04)
-      },
-    }
-    const build = builders[kind]
-    if (!build) throw new Error(`Unsupported piece kind: ${kind}`)
-    build()
-  }
-
-  private add(geometry: BufferGeometry, y: number): void {
+    const geometry = pieceGeometry(kind)
     const mesh = new Mesh(geometry, this.materials.get(this.color, 'idle'))
-    mesh.position.y = y
+    if (kind === 'bishop') mesh.rotation.y = -Math.PI / 2 - 0.4
     mesh.castShadow = true
     mesh.userData.msRole = 'piece'
     mesh.userData.msPieceId = this.id

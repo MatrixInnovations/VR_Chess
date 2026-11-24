@@ -2,6 +2,17 @@ import { createXRStore, type XRStore } from '@react-three/xr'
 
 import type { XrSessionPort } from './XrSessionPort'
 
+/** Same-origin copy of the WebXR input profiles. See public/xr-input-profiles/README.md. */
+export const XR_PROFILES_PATH = '/xr-input-profiles/'
+
+/**
+ * Absolute URL for the vendored profiles. The XR library joins paths with `new URL`, so a bare path is not enough.
+ * @param origin - Page origin. Tests pass a fixed value.
+ */
+export function xrProfilesBase(origin: string = typeof window === 'undefined' ? 'http://localhost' : window.location.origin): string {
+  return new URL(XR_PROFILES_PATH, origin).href
+}
+
 /**
  * Opens and closes the WebXR session without owning the chess game.
  *
@@ -31,6 +42,9 @@ export class WebXrHallSession implements XrSessionPort {
   get store(): XRStore {
     if (!this.xrStore) {
       this.xrStore = createXRStore({
+        // The CDN default is blocked by connect-src. Without a layout no controller state exists,
+        // and a failed hand model unmounts the canvas.
+        baseAssetPath: xrProfilesBase(),
         offerSession: false,
         emulate: this.emulator(),
         handTracking: true,
@@ -55,7 +69,7 @@ export class WebXrHallSession implements XrSessionPort {
         hitTest: true,
         domOverlay: false,
         foveation: 1,
-        frameBufferScaling: 1,
+        frameBufferScaling: 0.95,
         frameRate: (supported: ArrayLike<number>) => {
           const rates = Array.from(supported)
           if (rates.includes(72)) return 72

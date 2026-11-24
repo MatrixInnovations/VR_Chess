@@ -1,10 +1,27 @@
-import { CanvasTexture, Group, Mesh, MeshStandardMaterial, PlaneGeometry, sRGBEncoding } from 'three'
+import {
+  CanvasTexture,
+  Group,
+  LinearFilter,
+  Mesh,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  sRGBEncoding,
+} from 'three'
 
-import type { IClockFaceSnapshot, IClockSideFace } from '../mad-scientist/hall/ClockViewMirror'
+import type { ClockFaceExpiry, IClockFaceSnapshot, IClockSideFace } from '../mad-scientist/hall/ClockViewMirror'
 import { ClockMaterials } from '../mad-scientist/hall/ClockMaterials'
+import { clockIsLow } from '../ui/clockHud'
+
+const FACE_INK: Record<ClockFaceExpiry, { background: string; digit: string }> = {
+  running: { background: '#141210', digit: '#f3efe6' },
+  'provisional-expired': { background: '#c9a44c', digit: '#0e0e10' },
+  'confirmed-flag': { background: '#1a0505', digit: '#f3efe6' },
+  'offline-local-flag': { background: '#f2c2a0', digit: '#140c0a' },
+  'no-clock': { background: '#0e0e10', digit: '#d4af37' },
+}
 
 /**
- * Wooden chess clock on the table.
+ * Metal chess clock on the table, with a thin gold rim.
  *
  * Face colors come from {@link ClockMaterials}. Digits are painted from the
  * label Fridae already formatted, at most a few times a second.
@@ -17,6 +34,7 @@ export class PhysicalChessClock {
 
   private readonly materials = new ClockMaterials()
   private readonly body: Mesh
+  private readonly rim: Mesh
   private readonly whiteFace: Mesh
   private readonly blackFace: Mesh
   private readonly faces: Record<'white' | 'black', FacePaint> = {
@@ -33,12 +51,27 @@ export class PhysicalChessClock {
     this.body = new Mesh(bodyGeo, this.materials.body)
     this.body.rotation.x = -Math.PI / 2
     this.body.position.y = 0.02
-    this.body.castShadow = true
+    this.body.castShadow = false
     this.body.receiveShadow = true
     this.body.userData.msRole = 'clock'
+    const rimGeo = new PlaneGeometry(0.172, 0.082)
+    this.rim = new Mesh(
+      rimGeo,
+      new MeshStandardMaterial({
+        color: 0xf0d78a,
+        emissive: 0xc9a44c,
+        emissiveIntensity: 0.55,
+        metalness: 0.55,
+        roughness: 0.18,
+      }),
+    )
+    this.rim.name = 'clock-rim'
+    this.rim.rotation.x = -Math.PI / 2
+    this.rim.position.y = 0.016
+    this.rim.raycast = () => undefined
     this.whiteFace = this.face(-0.038)
     this.blackFace = this.face(0.038)
-    this.object.add(this.body, this.whiteFace, this.blackFace)
+    this.object.add(this.rim, this.body, this.whiteFace, this.blackFace)
   }
 
   /**
@@ -55,6 +88,8 @@ export class PhysicalChessClock {
   dispose(): void {
     this.object.removeFromParent()
     this.body.geometry.dispose()
+    this.rim.geometry.dispose()
+    ;(this.rim.material as MeshStandardMaterial).dispose()
     this.whiteFace.geometry.dispose()
     this.blackFace.geometry.dispose()
     for (const face of [this.faces.white, this.faces.black]) {
@@ -74,11 +109,12 @@ export class PhysicalChessClock {
 
   private paint(mesh: Mesh, face: IClockSideFace, side: 'white' | 'black'): void {
     const paint = this.faces[side]
-    const signature = `${face.label}|${face.expiry}`
+    const low = clockIsLow(face)
+    const signature = `${face.label}|${face.expiry}|${low ? 'low' : ''}`
     mesh.userData.clockLabel = face.label
     mesh.userData.clockSide = side
     if (paint.signature === signature) return
-    const drawn = this.redraw(paint, face.label, face.expiry === 'no-clock')
+    const drawn = this.redraw(paint, face.label, face.expiry, low)
     paint.signature = signature
     if (!drawn) {
       mesh.material = this.materials.forExpiry(face.expiry)
@@ -86,21 +122,17 @@ export class PhysicalChessClock {
     }
     if (!paint.material) {
       paint.material = this.materials.forExpiry(face.expiry).clone()
-      paint.material.map = paint.texture
-      paint.material.color.set('#ffffff')
-    } else {
-      const source = this.materials.forExpiry(face.expiry)
-      paint.material.color.copy(source.color)
-      paint.material.emissive.copy(source.emissive)
-      paint.material.emissiveIntensity = source.emissiveIntensity
-      paint.material.map = paint.texture
     }
+    paint.material.color.set('#ffffff')
+    paint.material.emissive.set('#000000')
+    paint.material.emissiveIntensity = 0
+    paint.material.map = paint.texture
     mesh.material = paint.material
     mesh.userData.clockPainted = face.label
   }
 
   /** Draw into the one canvas this face already owns. */
-  private redraw(paint: FacePaint, label: string, muted: boolean): boolean {
+  private redraw(paint: FacePaint, label: string, expiry: ClockFaceExpiry, low: boolean): boolean {
     if (typeof document === 'undefined') return false
     if (!paint.canvas) {
       paint.canvas = document.createElement('canvas')
@@ -114,16 +146,35 @@ export class PhysicalChessClock {
       return false
     }
     if (!context) return false
-    context.fillStyle = muted ? '#8d939c' : '#14181e'
+    const ink = FACE_INK[expiry]
+    context.fillStyle = ink.background
     context.fillRect(0, 0, paint.canvas.width, paint.canvas.height)
-    context.fillStyle = muted ? '#2a3038' : '#f4efe4'
-    context.font = 'bold 72px Georgia, serif'
+    if (expiry === 'confirmed-flag' || expiry === 'offline-local-flag') {
+      const offline = expiry === 'offline-local-flag'
+      context.strokeStyle = offline ? '#2a0906' : '#ffd0cc'
+      context.lineWidth = 8
+      context.strokeRect(12, 12, paint.canvas.width - 24, paint.canvas.height - 24)
+      context.fillStyle = offline ? '#2a0906' : '#ffe8e4'
+      context.font = '700 36px Georgia, serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('FLAG', paint.canvas.width / 2, 28)
+    }
+    context.fillStyle = low ? '#ffd8b0' : ink.digit
+    context.font = 'bold 64px Georgia, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
-    context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2)
+    context.fillText(label, paint.canvas.width / 2, paint.canvas.height / 2 + 10)
+    if (low) {
+      context.fillStyle = '#ffc9a0'
+      context.fillRect(18, paint.canvas.height - 16, paint.canvas.width - 36, 10)
+    }
     if (!paint.texture) {
       paint.texture = new CanvasTexture(paint.canvas)
       paint.texture.encoding = sRGBEncoding
+      paint.texture.magFilter = LinearFilter
+      paint.texture.minFilter = LinearFilter
+      paint.texture.generateMipmaps = false
     }
     paint.texture.needsUpdate = true
     return true

@@ -214,6 +214,7 @@ export class ChessApplication {
       },
       wasOffline: () => this.session.snapshot.mode === 'offline',
     })
+    this.shell.signIn.sync()
     this.shell.navigator.showBoard(this.viewPort)
     this.shell.navigator.subscribe(() => this.bump())
     this.shell.board.mountLive(this.viewPort, null, true)
@@ -229,6 +230,7 @@ export class ChessApplication {
     this.xrPump = new XrInputPump(this.picker, this.runtime.controllers, this.runtime.hands)
     this.physicalClock = new PhysicalChessClock()
     this.physicalClock.object.position.copy(this.runtime.hall.clockTap.object.position)
+    this.physicalClock.object.visible = false
     this.runtime.hall.root.add(this.physicalClock.object)
     this.fadeTapPlaceholder()
     this.voicePort = new VoiceSessionPort(this.session, (text) => {
@@ -379,6 +381,7 @@ export class ChessApplication {
    */
   async resign(): Promise<void> {
     const seat = this.session.snapshot.turn
+    this.menu.close()
     await this.session.submit({ kind: 'resign', id: this.ids.next(), source: 'pointer', seat })
     this.bump()
   }
@@ -431,6 +434,7 @@ export class ChessApplication {
         this.modes.switchTo('desktop3d')
         this.host.setView('seated')
         this.hud.setViewMode('desktop3d')
+        this.syncTableClock(false)
         this.message = this.xr.lastError
         this.bump()
         return
@@ -438,6 +442,7 @@ export class ChessApplication {
       this.host.setView('immersive')
       this.hud.setViewMode('immersive')
       this.shell.navigator.switchInGameView('immersive')
+      this.syncTableClock(true)
       this.message = ''
     } else {
       await this.xr.exit()
@@ -445,6 +450,7 @@ export class ChessApplication {
       this.host.setView('seated')
       this.hud.setViewMode('desktop3d')
       this.shell.navigator.switchInGameView('desktop3d')
+      this.syncTableClock(false)
       this.message = ''
     }
     this.bump()
@@ -466,6 +472,7 @@ export class ChessApplication {
     this.host.setView('immersive')
     this.hud.setViewMode('immersive')
     this.shell.navigator.switchInGameView('immersive')
+    this.syncTableClock(true)
     this.message = 'Passthrough. The table stays; the room is hidden.'
     this.bump()
   }
@@ -506,8 +513,9 @@ export class ChessApplication {
     this.bump()
   }
 
-  /** Open the Lichess sign-in screen and redraw. */
+  /** Open the Lichess sign-in screen over a closed menu, so the two panels never stack. */
   openSignIn(): void {
+    this.menu.close()
     this.shell.navigator.showSignIn()
     this.bump()
   }
@@ -515,11 +523,44 @@ export class ChessApplication {
   /** Start PKCE and redraw when the authorize URL is ready. */
   async beginSignIn(): Promise<void> {
     await this.shell.signIn.begin()
+    const url = this.shell.authPresenter.snapshot().authorizationUrl
     this.bump()
+    if (url && typeof window !== 'undefined') window.location.assign(url)
+  }
+
+  /** True while a seek or challenge request is still in flight. */
+  get seeking(): boolean {
+    return this.seekBusy
+  }
+
+  /** Seek a 10+0 game with the stored Lichess session. */
+  async playOnline(): Promise<void> {
+    if (this.seekBusy) return
+    this.seekBusy = true
+    this.bump()
+    try {
+      this.shell.lobbyPresenter.setTimeControl('10+0')
+      await this.seekFromLobby()
+    } finally {
+      this.seekBusy = false
+      this.bump()
+    }
+  }
+
+  /** Drop the Lichess session and redraw the signed-out controls. */
+  async signOutOfLichess(): Promise<void> {
+    await this.shell.signIn.signOut()
+    this.bump()
+  }
+
+  /** The other player in the current online game, or null offline. */
+  opponentCard(): ReturnType<GameSession['opponentCard']> {
+    return this.session.opponentCard()
   }
 
   /** Open the lobby from a stored session and redraw. Signed-out players see sign-in. */
   openLobby(): void {
+    this.menu.close()
     this.shell.signIn.continueWithSession()
     if (this.shell.authPresenter.snapshot().phase === 'denied') this.shell.navigator.showSignIn()
     this.bump()
@@ -533,8 +574,15 @@ export class ChessApplication {
 
   /** Challenge from the lobby and redraw after the request settles. */
   async challengeFromLobby(): Promise<void> {
-    await this.shell.lobby.challenge()
+    if (this.seekBusy) return
+    this.seekBusy = true
     this.bump()
+    try {
+      await this.shell.lobby.challenge()
+    } finally {
+      this.seekBusy = false
+      this.bump()
+    }
   }
 
   /** Pass and play from the lobby and redraw. */
@@ -590,9 +638,13 @@ export class ChessApplication {
     } catch {
       return
     }
-    if (!url.searchParams.has('code') || !url.searchParams.has('state')) return
+    const code = url.searchParams.has('code') && url.searchParams.has('state')
+    const denied = url.searchParams.has('error') && url.searchParams.has('state')
+    if (!code && !denied) return
     await this.shell.signIn.complete(href)
     if (typeof history !== 'undefined') history.replaceState(null, '', `${url.pathname}${url.hash}`)
+    // A cancelled sign-in is told by the Lichess dock. The left panel would sit on the clock and the tour.
+    if (this.shell.authPresenter.snapshot().phase === 'denied') this.shell.navigator.showBoard(this.viewPort)
     this.bump()
   }
 
@@ -663,6 +715,8 @@ export class ChessApplication {
       y: event.clientY - rect.top,
       pointerId: event.pointerId,
     })
+    const orbit = this.runtime.hall.orbit
+    if (orbit) orbit.enabled = !this.runtime.grab.isGrabbing()
     this.bump()
   }
 
@@ -775,6 +829,13 @@ export class ChessApplication {
     return clock
   }
 
+  private seekBusy = false
+
+  /** The table clock is the only clock a headset can see. Desktop keeps the HUD. */
+  private syncTableClock(visible: boolean): void {
+    this.physicalClock.object.visible = visible
+  }
+
   private fadeTapPlaceholder(): void {
     const material = this.runtime.hall.clockTap.object.material
     if (material instanceof MeshStandardMaterial) {
@@ -804,7 +865,9 @@ export class ChessApplication {
   }
 
   private static redirectUri(): string {
-    if (typeof window === 'undefined') return 'http://localhost:3000/'
+    const configured = process.env.NEXT_PUBLIC_LICHESS_REDIRECT_URI
+    if (configured) return configured
+    if (typeof window === 'undefined') return 'https://vr-chess-hall.netlify.app/'
     return `${window.location.origin}/`
   }
 }

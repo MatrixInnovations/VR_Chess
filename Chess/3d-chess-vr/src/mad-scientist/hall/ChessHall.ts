@@ -1,10 +1,12 @@
 import {
   BoxGeometry,
+  BufferGeometry,
+  CylinderGeometry,
   Group,
   Mesh,
-  MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
+  TorusGeometry,
   Vector3,
 } from 'three'
 
@@ -18,8 +20,10 @@ import {
   SEATED_EYE_Z_M,
   TABLE_TOP_Y,
 } from './metrics'
-import { PieceMaterialSet } from './PieceMaterialSet'
+import { PieceMaterialSet, type HallMaterial } from './PieceMaterialSet'
+import { disposePieceGeometries } from './PieceGeometryCache'
 import { PieceModel } from './PieceModel'
+import { TableDecals } from './TableDecals'
 
 /** Optional pieces and a shared material set for {@link ChessHall}. */
 export interface ChessHallOptions {
@@ -55,11 +59,22 @@ export class ChessHall {
   /** Materials shared by every piece in the hall. */
   readonly materials: PieceMaterialSet
 
+  /** Desktop post pass. Null on Quest and in tests without WebGL. */
+  grade: { render: () => void } | null = null
+
+  /** Desktop orbit. Null until the page attaches one. */
+  orbit: { update: () => void; enabled: boolean } | null = null
+
+  /** Desktop planar mirror. Null on Quest and in tests without WebGL. */
+  reflector: { visible: boolean } | null = null
+
+  private decals: TableDecals | null = null
+
   private readonly pieceList: PieceModel[] = []
 
   private readonly pieceById = new Map<string, PieceModel>()
 
-  private readonly geometries: BoxGeometry[] = []
+  private readonly geometries: BufferGeometry[] = []
 
   private readonly ownsMaterials: boolean
 
@@ -72,7 +87,7 @@ export class ChessHall {
     this.materials = options.materials ?? new PieceMaterialSet()
     this.board = new BoardModel(this.materials)
     this.lighting = new HallLighting()
-    this.clockTap = new ClockTapTarget({ x: 0.42, y: TABLE_TOP_Y + 0.03, z: 0.05 })
+    this.clockTap = new ClockTapTarget({ x: 0.33, y: TABLE_TOP_Y + 0.03, z: 0.32 })
     this.camera = new PerspectiveCamera(50, 1, 0.05, 20)
     // Sit behind the near table edge and look slightly down at the board.
     this.camera.position.set(0, SEATED_EYE_HEIGHT_M, SEATED_EYE_Z_M)
@@ -82,7 +97,38 @@ export class ChessHall {
     this.root.add(this.board.object)
     this.root.add(this.lighting.object)
     this.root.add(this.clockTap.object)
+    this.decals = new TableDecals(this.root, this.materials)
     this.placePieces(options.pieces ?? [])
+    this.syncDecals()
+  }
+
+  /** Hero framing for the desktop shot. XR keeps the seated eye. */
+  frameDesktop(): void {
+    this.camera.fov = 40
+    this.camera.position.set(0, 1.1, 0.6)
+    this.camera.lookAt(0, 0.78, -0.04)
+    this.camera.updateProjectionMatrix()
+  }
+
+  /** Wider documentation shot. The page uses {@link frameDesktop}. */
+  frameDocumentation(): void {
+    this.camera.fov = 40
+    this.camera.position.set(0.12, 1.32, 1.1)
+    this.camera.lookAt(0, 0.8, 0)
+    this.camera.updateProjectionMatrix()
+  }
+
+  /** Desktop reflector and scratches, or the Quest cuts. */
+  setTier(tier: 'desktop' | 'quest'): void {
+    this.lighting.setTier(tier)
+    this.materials.setTier(tier)
+    this.decals?.setContactEnabled(tier === 'desktop')
+    if (tier === 'quest' && this.reflector) this.reflector.visible = false
+  }
+
+  /** Move felt and contact discs. Reuses scratch matrices. */
+  syncDecals(): void {
+    this.decals?.sync(this.pieceList)
   }
 
   /** Eye position in meters. A copy, so callers cannot shove the camera. */
@@ -108,6 +154,7 @@ export class ChessHall {
     this.pieceList.push(model)
     this.pieceById.set(model.id, model)
     this.shadowGenerationValue += 1
+    this.syncDecals()
     return model
   }
 
@@ -123,6 +170,7 @@ export class ChessHall {
     const index = this.pieceList.indexOf(model)
     if (index >= 0) this.pieceList.splice(index, 1)
     this.shadowGenerationValue += 1
+    this.syncDecals()
   }
 
   /**
@@ -163,7 +211,9 @@ export class ChessHall {
     this.board.dispose()
     this.lighting.dispose()
     this.clockTap.dispose()
+    this.decals?.dispose()
     if (this.ownsMaterials) this.materials.dispose()
+    disposePieceGeometries()
     for (const geometry of this.geometries) geometry.dispose()
     this.root.clear()
   }
@@ -195,7 +245,7 @@ export class ChessHall {
       'ceiling',
       { x: 6, y: 0.08, z: 6 },
       { x: 0, y: 3, z: 0 },
-      this.materials.plaster(),
+      this.materials.ceiling(),
       room,
       false,
     )
@@ -206,7 +256,7 @@ export class ChessHall {
       { name: 'wall-west', size: { x: 0.08, y: 3, z: 6 }, position: { x: -3, y: 1.5, z: 0 } },
     ]
     for (const wall of walls) {
-      this.addBox(wall.name, wall.size, wall.position, this.materials.plaster(), room, false)
+      this.addBox(wall.name, wall.size, wall.position, this.materials.wall(), room, false)
     }
 
     const tableTop = TABLE_TOP_Y
@@ -214,10 +264,10 @@ export class ChessHall {
       'table',
       { x: 1.3, y: 0.04, z: 0.9 },
       { x: 0, y: tableTop - 0.02, z: 0 },
-      this.materials.boardFrame(),
+      this.materials.tableTop(),
       room,
       true,
-      true,
+      false,
     )
     const underside = tableTop - 0.04
     const legHeight = underside - 0.04
@@ -233,13 +283,59 @@ export class ChessHall {
         `table-leg-${index}`,
         { x: 0.06, y: legHeight, z: 0.06 },
         { x: leg.x, y: legY, z: leg.z },
-        this.materials.trimWood(),
+        this.materials.leg(),
         room,
         false,
       )
     })
     this.buildDetail(room)
+    this.buildSetDressing(room)
     this.root.add(room)
+  }
+
+  /**
+   * Gold floor arcs and four gold-ringed columns.
+   * None of these cast shadows. The key light remains the only shadow caster.
+   */
+  private buildSetDressing(room: Group): void {
+    const gold = this.materials.gold()
+    const stone = this.materials.boardFrame()
+    for (const radius of [1.15, 1.85, 2.45]) {
+      const ringGeometry = new TorusGeometry(radius, 0.006, 8, 72)
+      this.geometries.push(ringGeometry)
+      const ring = new Mesh(ringGeometry, gold)
+      ring.name = `floor-ring-${radius}`
+      ring.rotation.x = Math.PI / 2
+      ring.position.y = 0.061
+      ring.raycast = () => undefined
+      room.add(ring)
+    }
+    const columns = [
+      { x: -1.55, z: -1.15 },
+      { x: 1.55, z: -1.15 },
+      { x: -1.55, z: 1.15 },
+      { x: 1.55, z: 1.15 },
+    ]
+    columns.forEach((at, index) => {
+      const group = new Group()
+      group.name = `column-${index}`
+      const shaftGeometry = new CylinderGeometry(0.08, 0.08, 2.6, 12)
+      this.geometries.push(shaftGeometry)
+      const shaft = new Mesh(shaftGeometry, stone)
+      shaft.position.y = 1.3
+      shaft.castShadow = false
+      group.add(shaft)
+      for (const height of [0.22, 1.15, 2.45]) {
+        const bandGeometry = new TorusGeometry(0.135, 0.018, 8, 20)
+        this.geometries.push(bandGeometry)
+        const band = new Mesh(bandGeometry, gold)
+        band.position.y = height
+        band.raycast = () => undefined
+        group.add(band)
+      }
+      group.position.set(at.x, 0, at.z)
+      room.add(group)
+    })
   }
 
   /**
@@ -256,6 +352,8 @@ export class ChessHall {
       room,
       true,
     )
+    const rug = room.getObjectByName('rug')
+    if (rug) rug.visible = false
     const baseboards: Array<{ name: string; size: Vec3; position: Vec3 }> = [
       { name: 'baseboard-north', size: { x: 5.7, y: 0.1, z: 0.04 }, position: { x: 0, y: 0.09, z: -2.88 } },
       { name: 'baseboard-south', size: { x: 5.7, y: 0.1, z: 0.04 }, position: { x: 0, y: 0.09, z: 2.88 } },
@@ -263,11 +361,14 @@ export class ChessHall {
       { name: 'baseboard-west', size: { x: 0.04, y: 0.1, z: 5.7 }, position: { x: -2.88, y: 0.09, z: 0 } },
     ]
     for (const board of baseboards) {
-      this.addBox(board.name, board.size, board.position, this.materials.trimWood(), room, false)
+      this.addBox(board.name, board.size, board.position, this.materials.gold(), room, false)
+      const mesh = room.getObjectByName(board.name)
+      if (mesh) mesh.visible = false
     }
 
     const windowFrame = new Group()
     windowFrame.name = 'window-frame'
+    windowFrame.visible = false
     room.add(windowFrame)
     this.addBox(
       'window-trim',
@@ -307,7 +408,7 @@ export class ChessHall {
     name: string,
     size: Vec3,
     position: Vec3,
-    material: MeshStandardMaterial,
+    material: HallMaterial,
     parent: Object3D,
     receiveShadow: boolean,
     castShadow = false,

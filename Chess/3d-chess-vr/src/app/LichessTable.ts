@@ -87,9 +87,19 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
    * @param callbackUrl - Full redirect URL.
    */
   async completeLogin(callbackUrl: string): Promise<{ username: string }> {
+    if (this.callbackDenied(callbackUrl)) {
+      this.store.delete('ultron.oauth.transaction')
+      const failure = new Error('The user denied authorization') as Error & { code?: string }
+      failure.code = 'access_denied'
+      throw failure
+    }
     const oauth = this.ensureOauth()
     const exchanged = await oauth.completeAuthorization(callbackUrl)
-    if (!exchanged.ok) throw new Error(exchanged.message)
+    if (!exchanged.ok) {
+      const failure = new Error(exchanged.message) as Error & { code?: string }
+      failure.code = exchanged.reason === 'authorization-denied' ? 'access_denied' : exchanged.reason
+      throw failure
+    }
     const accessToken = oauth.getAccessToken()
     if (!accessToken) throw new Error('Sign-in finished without a token')
     const account = await this.client.getAccount(accessToken, new AbortController().signal)
@@ -255,6 +265,14 @@ export class LichessTable implements ILichessAuth, ILichessLobby, IConnectionPor
       ? await this.client.offerOrAcceptDraw(token, gameId, signal)
       : await this.client.declineDraw(token, gameId, signal)
     if (!result.ok) throw new Error(result.message)
+  }
+
+  private callbackDenied(callbackUrl: string): boolean {
+    try {
+      return new URL(callbackUrl).searchParams.get('error') === 'access_denied'
+    } catch {
+      return false
+    }
   }
 
   private ensureOauth(): OAuthPkceClient {

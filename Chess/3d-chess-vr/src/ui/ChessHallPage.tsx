@@ -1,4 +1,6 @@
 import { Canvas, useFrame, type RootState } from '@react-three/fiber'
+import { PCFShadowMap, Vector3, type WebGLRenderer } from 'three'
+import { configureHallStage } from '../mad-scientist/hall/HallStage'
 import { XR, XROrigin, useXR } from '@react-three/xr'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type RefObject } from 'react'
 import type { Group } from 'three'
@@ -7,7 +9,19 @@ import { ChessApplication, type PointerSurface } from '../app/ChessApplication'
 import { readXrPoses, type LooseXrInput, type XrFrameLike } from '../app/XrInputPump'
 import { WebXrHallSession } from '../app/WebXrHallSession'
 import { ChessHallView } from '../mad-scientist/react/ChessHallView'
-import { SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
+import { BOARD_SURFACE_Y, SEATED_EYE_Z_M } from '../mad-scientist/hall/metrics'
+import { clockFaceClass, clockNote, formatClockMs } from './clockHud'
+import { publishFrameSample, readCenterProbe, readLuminanceStats, type FrameProbe, type PieceLuminance } from './frameSample'
+import { LichessDock } from './LichessDock'
+
+const boardProbePoint = new Vector3()
+
+/** Screenshots and the pixel probe need the buffer. The live view does not. */
+function keepDrawingBuffer(): boolean {
+  if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search)
+  return params.get('probe') === '1' || params.get('effects') === '1'
+}
 
 /**
  * Props for {@link ChessHallPage}. Tests pass an application. The route boots one.
@@ -25,16 +39,34 @@ export interface ChessHallPageProps {
  */
 export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const [model] = useState(() => app ?? ChessApplication.boot())
+  const [mounted, setMounted] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
   const revision = useSyncExternalStore(
     (listener) => model.watch(listener),
     () => model.revision,
     () => 0,
   )
   useEffect(() => {
+    setMounted(true)
     if (typeof window === 'undefined') return undefined
+    if (window.sessionStorage.getItem('hall-intro-seen') !== '1') setShowIntro(true)
     const global = window as Window & { __CHESS_APP__?: ChessApplication }
     if (process.env.NODE_ENV !== 'production') global.__CHESS_APP__ = model
-    void model.completeRedirectIfPresent(window.location.href)
+    const stripAuthQuery = () => {
+      try {
+        const loc = window.location
+        if (!loc.search.includes('error=') && !loc.search.includes('code=')) return
+        const clean = `${loc.pathname}${loc.hash}` || '/'
+        window.history.replaceState(null, '', clean)
+      } catch {
+        // Next may still be writing the first history entry. The interval tries again.
+      }
+    }
+    void model.completeRedirectIfPresent(window.location.href).finally(() => {
+      stripAuthQuery()
+      const timer = window.setInterval(stripAuthQuery, 100)
+      window.setTimeout(() => window.clearInterval(timer), 2000)
+    })
     return () => {
       if (global.__CHESS_APP__ === model) delete global.__CHESS_APP__
     }
@@ -47,40 +79,84 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
   const signIn = model.shell.authPresenter.snapshot()
   const lobby = model.shell.lobbyPresenter.snapshot()
   const waiting = model.shell.waitingPresenter.snapshot()
+  const fridae = model.readModel.fridae()
+  const clockBlank =
+    screen === 'waiting' ||
+    !fridae ||
+    fridae.kind === 'absent' ||
+    fridae.kind === 'unlimited' ||
+    fridae.kind === 'correspondence' ||
+    fridae.whiteDisplayMs == null
   const over = model.shell.gameOverPresenter.snapshot()
   const error = model.shell.errorPresenter.snapshot()
   const snap = model.game.snapshot
   void revision
+  const [glPrefs] = useState(() => {
+    const questBrowser = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
+    const ratio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    return { dpr: questBrowser ? 1 : Math.min(ratio, 2), antialias: false }
+  })
   return (
     <main className="hall-page">
-      <h1>Chess Hall</h1>
-      <p className="hall-lead">
-        Seated at a wooden board. Pass and play is ready. Lichess is in the menu.
-      </p>
-      <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
-        <p data-testid="clock-white" data-active={clock.white.isActive}>
-          White {formatMs(clock.white.remainingMs)}
+      <div className="hall-column">
+        <h1 className="hall-title">Chess Hall</h1>
+        <p className="hall-meta">
+          {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} ·{' '}
+          <span className={snap.turn === 'black' ? 'hall-turn-black' : 'hall-turn'}>{snap.turn === 'black' ? 'Black' : 'White'}</span> to move
+          {snap.outcome ? ` · ${snap.outcome.status}` : ''}
         </p>
-        <p data-testid="clock-black" data-active={clock.black.isActive}>
-          Black {formatMs(clock.black.remainingMs)}
-        </p>
-        <p data-testid="clock-active">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
-        <p data-testid="session-id" className="hall-sr">{model.game.id}</p>
-        <p data-testid="presentation">{model.presentation}</p>
-        {model.message ? <p data-testid="status-line">{model.message}</p> : null}
-      </section>
-      {step ? (
-        <section className="hall-tour" aria-label="Tour">
-          <h2>{step.title}</h2>
-          <p>{step.body}</p>
-          <button type="button" onClick={() => model.tourNext()}>
-            Next
-          </button>
-          <button type="button" onClick={() => model.tourSkip()}>
-            Skip tour
-          </button>
+        <section className="hall-hud" aria-label="Clock and status" hidden={!model.hud.isPresented}>
+          <p data-testid="clock-white" data-active={clock.white.isActive} data-expiry={clockBlank ? 'no-clock' : clock.white.expiry} className={clockFaceClass({ ...clock.white, blank: clockBlank })}>
+            White {formatClockMs(clock.white.remainingMs, clockBlank || !mounted)}
+            {clockNote({ ...clock.white, blank: clockBlank })}
+          </p>
+          <p data-testid="clock-black" data-active={clock.black.isActive} data-expiry={clockBlank ? 'no-clock' : clock.black.expiry} className={clockFaceClass({ ...clock.black, blank: clockBlank })}>
+            Black {formatClockMs(clock.black.remainingMs, clockBlank || !mounted)}
+            {clockNote({ ...clock.black, blank: clockBlank })}
+          </p>
+          <p data-testid="clock-active" className="hall-sr" aria-hidden="true">{clock.white.isActive ? 'white' : clock.black.isActive ? 'black' : 'none'}</p>
+          <p data-testid="session-id" className="hall-sr" aria-hidden="true">{model.game.id}</p>
+          <p data-testid="presentation" className="hall-sr" aria-hidden="true">{model.presentation}</p>
+          {model.message ? <p data-testid="status-line">{model.message}</p> : null}
         </section>
-      ) : null}
+        {showIntro ? (
+          <p className="hall-lead">
+            Seated at a marble board. Pass and play is ready. Lichess is in the menu.{' '}
+            <button
+              type="button"
+              onClick={() => {
+                window.sessionStorage.setItem('hall-intro-seen', '1')
+                setShowIntro(false)
+              }}
+            >
+              Dismiss
+            </button>
+          </p>
+        ) : null}
+        {step ? (
+          <section className="hall-tour" aria-label="Tour">
+            <h2>{step.title}</h2>
+            <p>{step.body}</p>
+            <button type="button" onClick={() => model.tourNext()}>
+              Next
+            </button>
+            <button type="button" onClick={() => model.tourSkip()}>
+              Skip tour
+            </button>
+          </section>
+        ) : null}
+      </div>
+      <LichessDock
+        username={signIn.username}
+        signedIn={signIn.phase === 'signed-in' && Boolean(signIn.username)}
+        redirecting={signIn.phase === 'redirecting'}
+        busy={model.seeking}
+        notice={signIn.phase === 'denied' ? signIn.message : lobby.message}
+        opponent={model.opponentCard()}
+        onSignIn={() => void model.beginSignIn()}
+        onPlay={() => void model.playOnline()}
+        onSignOut={() => void model.signOutOfLichess()}
+      />
       <div className="hall-actions">
         <button type="button" onClick={() => void model.toggleImmersive()}>
           {model.presentation === 'immersive' ? 'Back to 3D' : '3D / Immersive'}
@@ -109,7 +185,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           ))}
         </div>
       ) : null}
-      {screen === 'sign-in' ? <SignInPanel model={model} phase={signIn.phase} url={signIn.authorizationUrl} message={signIn.message} username={signIn.username} /> : null}
+      {screen === 'sign-in' ? <SignInPanel model={model} phase={signIn.phase} url={signIn.authorizationUrl} message={signIn.phase === 'denied' ? null : signIn.message} username={signIn.username} /> : null}
       {screen === 'lobby' ? <LobbyPanel model={model} time={lobby.timeControl} message={lobby.message} /> : null}
       {screen === 'waiting' ? (
         <div className="hall-panel">
@@ -140,18 +216,26 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
           </button>
         </div>
       ) : null}
-      <p className="hall-meta">
-        {snap.mode === 'offline' ? 'Pass and play' : `Lichess ${snap.gameId ?? ''}`} · {snap.turn} to move
-        {snap.outcome ? ` · ${snap.outcome.status}` : ''}
-      </p>
       <div className="hall-stage">
-        <Canvas
+        {mounted ? <Canvas
+          dpr={glPrefs.dpr}
           shadows="percentage"
+          gl={{ preserveDrawingBuffer: keepDrawingBuffer(), antialias: glPrefs.antialias }}
           camera={model.runtime.hall.camera}
           onCreated={(state: RootState) => {
-            if (state.gl.shadowMap) {
-              state.gl.shadowMap.autoUpdate = false
-              state.gl.shadowMap.needsUpdate = true
+            const gl = state.gl as WebGLRenderer
+            if (gl.shadowMap) {
+              gl.shadowMap.autoUpdate = false
+              gl.shadowMap.needsUpdate = true
+              gl.shadowMap.type = PCFShadowMap
+            }
+            const quest = typeof navigator !== 'undefined' && /Quest|Oculus/i.test(navigator.userAgent)
+            const forceEffects = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('effects') === '1'
+            const skipEffects = typeof navigator !== 'undefined' && navigator.webdriver && !forceEffects
+            if (state.scene && typeof gl.render === 'function') {
+              configureHallStage(gl, state.scene, state.camera, model.runtime.hall, quest, {
+                effects: !quest && !skipEffects,
+              })
             }
             model.attachPointer(state.gl.domElement as unknown as PointerSurface)
           }}
@@ -169,7 +253,7 @@ export function ChessHallPage({ app }: ChessHallPageProps = {}): ReactElement {
               <ChessHallView hall={model.runtime.hall} />
             </>
           )}
-        </Canvas>
+        </Canvas> : null}
       </div>
     </main>
   )
@@ -184,7 +268,16 @@ function HallTicker({ model }: { model: ChessApplication }): null {
   const wasAnimating = useRef(false)
   const wasGrabbing = useRef(false)
   const shadowGeneration = useRef(-1)
+  const flags = useRef<{ probe: boolean; norender: boolean } | null>(null)
   useFrame((state) => {
+    if (!flags.current && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const e2e = process.env.NEXT_PUBLIC_E2E === '1'
+      flags.current = {
+        probe: e2e && params.get('probe') === '1',
+        norender: e2e && params.get('norender') === '1',
+      }
+    }
     model.frame()
     const animating = model.runtime.animator.isAnimating()
     const grabbing = model.runtime.grab.isGrabbing()
@@ -199,7 +292,36 @@ function HallTicker({ model }: { model: ChessApplication }): null {
     wasGrabbing.current = grabbing
     shadowGeneration.current = generation
     if (dirty && state.gl.shadowMap) state.gl.shadowMap.needsUpdate = true
-  })
+    const presenting = Boolean(state.gl.xr?.isPresenting)
+    const orbit = model.runtime.hall.orbit
+    if (orbit) {
+      if (presenting) orbit.enabled = false
+      else {
+        orbit.enabled = !grabbing
+        if (!grabbing) orbit.update()
+      }
+    }
+    const grade = model.runtime.hall.grade
+    if (!flags.current?.norender) {
+      if (grade) grade.render()
+      else if (typeof state.gl.render === 'function') state.gl.render(state.scene, state.camera)
+    }
+    if (flags.current?.probe) {
+      boardProbePoint.set(0, BOARD_SURFACE_Y, 0)
+      boardProbePoint.project(state.camera)
+      const sample = readCenterProbe(state.gl, { x: boardProbePoint.x, y: boardProbePoint.y })
+      if (sample) (window as Window & { __CHESS_FRAME_PROBE__?: FrameProbe }).__CHESS_FRAME_PROBE__ = sample
+      const king = model.runtime.hall.getPiece('white-king')
+      if (king) {
+        king.object.getWorldPosition(boardProbePoint)
+        boardProbePoint.y += 0.042
+        boardProbePoint.project(state.camera)
+        const shade = readLuminanceStats(state.gl, { x: boardProbePoint.x, y: boardProbePoint.y }, 32)
+        if (shade) (window as Window & { __CHESS_PIECE_PROBE__?: PieceLuminance }).__CHESS_PIECE_PROBE__ = shade
+      }
+    }
+    publishFrameSample(state.gl, presenting)
+  }, 1)
   return null
 }
 
@@ -257,6 +379,18 @@ function MenuPanel({ model }: { model: ChessApplication }): ReactElement {
   )
 }
 
+const SIGN_IN_STATUS: Record<string, string> = {
+  'signed-out': 'Not signed in yet.',
+  redirecting: 'Opening Lichess…',
+  'signed-in': 'Signed in to Lichess.',
+  denied: 'Sign-in was cancelled.',
+}
+
+/** Words a player reads instead of the presenter's state name. */
+export function signInStatus(phase: string): string {
+  return SIGN_IN_STATUS[phase] ?? 'Checking your Lichess sign-in…'
+}
+
 /**
  * PKCE sign-in. The token is not rendered.
  * @param props - Presenter fields and the application.
@@ -285,7 +419,7 @@ function SignInPanel(props: {
       <button type="button" onClick={() => props.model.backToBoard()}>
         Back to the board
       </button>
-      <p data-testid="sign-in-phase">{props.phase}</p>
+      <p data-testid="sign-in-phase" data-phase={props.phase}>{signInStatus(props.phase)}</p>
     </div>
   )
 }
@@ -325,14 +459,3 @@ function LobbyPanel(props: { model: ChessApplication; time: string; message: str
   )
 }
 
-/**
- * Format a published millisecond value. This does not sample a clock.
- * @param ms - Remaining time from the read model.
- * @returns `m:ss`.
- */
-function formatMs(ms: number): string {
-  const whole = Math.max(0, Math.floor(ms / 1000))
-  const minutes = Math.floor(whole / 60)
-  const seconds = whole % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}

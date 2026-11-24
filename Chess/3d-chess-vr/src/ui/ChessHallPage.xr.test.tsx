@@ -3,6 +3,7 @@ import { Group } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 
 const frames: Array<(state: unknown, delta: number, frame?: unknown) => void> = []
+const xrInputs: { current: readonly unknown[] | null } = { current: null }
 
 vi.mock('@react-three/fiber', () => {
   const React = require('react') as typeof import('react')
@@ -49,7 +50,7 @@ vi.mock('@react-three/xr', () => {
       },
     ),
     useXR: (selector?: (state: { inputSourceStates: readonly unknown[] }) => unknown) => {
-      const inputs = [
+      const inputs = xrInputs.current ?? [
         {
           id: 'left-hand',
           type: 'hand',
@@ -159,5 +160,66 @@ describe('ChessHallPage XR frame path', () => {
     time = 5_000
     model.frame(time)
     expect(pawn?.getSquare()).toEqual({ file: 4, rank: 4 })
+  })
+
+  it('a controller trigger picks up the e2 pawn and drops it on e4', () => {
+    frames.length = 0
+    let time = 0
+    const model = new ChessApplication({ now: () => time, xr: undefined })
+    const home = model.runtime.hall.board.worldPosition({ file: 4, rank: 6 })
+    const dest = model.runtime.hall.board.worldPosition({ file: 4, rank: 4 })
+    const trigger = { pressed: false, touched: false, value: 0 }
+    // The shape @react-three/xr 6 hands to useXR: gamepad is keyed by component, the raw buttons live on inputSource.
+    xrInputs.current = [
+      {
+        id: 'right-controller',
+        type: 'controller',
+        isPrimary: true,
+        inputSource: {
+          handedness: 'right',
+          targetRaySpace: { id: 'right-ray' },
+          gamepad: { buttons: [trigger] },
+          profiles: ['meta-quest-touch-pro'],
+        },
+        gamepad: { 'xr-standard-trigger': { state: 'default', button: 0 } },
+        layout: { selectComponentId: 'xr-standard-trigger' },
+      },
+    ]
+    try {
+      render(<ChessHallPage app={model} />)
+      const down = { x: -Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 }
+      let aim = home
+      const frame = {
+        getPose: () => ({ transform: { position: { x: aim.x, y: aim.y + 0.3, z: aim.z - 0.62 }, orientation: down } }),
+        getJointPose: () => null,
+      }
+      const state = {
+        gl: {
+          shadowMap: { needsUpdate: false, autoUpdate: false },
+          xr: { getReferenceSpace: () => ({ name: 'local-floor' }) },
+        },
+      }
+      const tick = () => {
+        for (const callback of frames) callback(state, 0, frame)
+      }
+      tick()
+      expect(model.runtime.grab.isGrabbing()).toBe(false)
+      trigger.pressed = true
+      trigger.value = 1
+      tick()
+      expect(model.runtime.grab.isGrabbing()).toBe(true)
+      aim = dest
+      tick()
+      trigger.pressed = false
+      trigger.value = 0
+      tick()
+      expect(model.runtime.grab.isGrabbing()).toBe(false)
+      expect(model.game.getPieces().find((piece) => piece.id === 'white-pawn-5')?.square).toEqual({ file: 4, rank: 4 })
+      time = 5_000
+      model.frame(time)
+      expect(model.runtime.hall.getPieces().find((piece) => piece.id === 'white-pawn-5')?.getSquare()).toEqual({ file: 4, rank: 4 })
+    } finally {
+      xrInputs.current = null
+    }
   })
 })

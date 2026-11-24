@@ -10,7 +10,7 @@ export function tourSteps(): readonly ITourStep[] {
     {
       id: 'seat',
       title: 'You are seated at the board',
-      body: 'This is a wooden hall, seen from a chair. Drag a piece with the mouse, or pinch it with a Quest hand.',
+      body: 'This is a marble hall, seen from a chair. Drag a piece with the mouse, or pinch it with a Quest hand.',
     },
     {
       id: 'moves',
@@ -19,8 +19,8 @@ export function tourSteps(): readonly ITourStep[] {
     },
     {
       id: 'clock',
-      title: 'The clock is on the table',
-      body: 'Both times sit on the clock beside the board. After you move, your clock stops and your opponent’s starts.',
+      title: 'The clock',
+      body: 'On desktop both times are at the top left. In the headset they sit on the clock beside the board. After you move, your clock stops and your opponent’s starts.',
     },
     {
       id: 'menu',
@@ -35,7 +35,7 @@ export function tourSteps(): readonly ITourStep[] {
     {
       id: 'immersive',
       title: '3D and immersive',
-      body: 'The 3D / Immersive switch keeps this game and this clock. On a Quest Pro it enters WebXR. The same button comes back.',
+      body: 'The 3D / Immersive switch keeps this game and this clock. On a Quest it enters WebXR. The same button comes back.',
     },
   ]
 }

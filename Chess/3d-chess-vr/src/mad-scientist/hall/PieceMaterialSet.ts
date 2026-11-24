@@ -1,4 +1,14 @@
-import { Mesh, MeshStandardMaterial, Texture } from 'three'
+import {
+  Mesh,
+  MeshBasicMaterial,
+  MeshLambertMaterial,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  Texture,
+} from 'three'
+
+import type { BakedMarbleMaps } from './MarbleVeins'
+import { bakeMarble, contactFalloffTexture, coordinateBorderTexture, marbleBakeSize } from './MarbleTexture'
 
 import type { PieceColor, PieceFinish } from '../contracts/types'
 
@@ -7,14 +17,14 @@ export interface MaterialHost {
   meshes(): readonly Mesh[]
 }
 
-/** Light squares are felted maple. Dark squares are walnut. */
+/** Light squares are cream marble. Dark squares are black marble. */
 export type BoardTone = 'light' | 'dark'
 
 /** How heavy the shared material set is on a Quest Pro GPU. */
 export interface MaterialGpuBudget {
   /** One material per look. Not one per square or per piece. */
   readonly materialCount: number
-  /** Texture maps. Zero is the budget: sampled maps blow the 72fps floor. */
+  /** Sampled texture slots. The marble veins themselves are a shader, not 64 maps. */
   readonly textureCount: number
 }
 
@@ -30,87 +40,144 @@ const TEXTURE_SLOTS = [
   'envMap',
 ] as const
 
+const PIECE_KEYS = [
+  'white:idle',
+  'black:idle',
+  'white:selected',
+  'black:selected',
+  'white:dragging',
+  'black:dragging',
+] as const
+
+/** Stone and cloth stay cheap. Metals keep a reflection map. */
+export type HallMaterial = MeshPhysicalMaterial | MeshStandardMaterial | MeshLambertMaterial | MeshBasicMaterial
+
 /**
- * Shared materials for pieces and the hall.
+ * Shared materials for the metal set and the black-marble hall.
  *
- * White is matte boxwood. Black is denser ebony, not a recolor of the same
- * shader. The board is felt and walnut with no texture maps. Every look is
- * one {@link MeshStandardMaterial} so the Quest Pro shadow pass stays inside
- * the 72fps floor. Do not raise {@link PerformanceBudget} to hide a map.
+ * Chrome, copper, marble, and gold are one material per look.
+ * Reflections live on the metal envMaps only, so the room does not sample the PMREM.
  */
 export class PieceMaterialSet {
-  private readonly table = new Map<string, MeshStandardMaterial>()
+  private readonly table = new Map<string, HallMaterial>()
+
+  private readonly textures: Texture[] = []
+
+  private contactMaterial: MeshBasicMaterial | null = null
+
+  private bakeTargets: { dispose(): void }[] = []
+
+  private reflection: Texture | null = null
 
   /**
    * Creates the instance.
    */
   constructor() {
-    this.put('white:idle', this.make({ color: 0xf2e6d0, roughness: 0.62, metalness: 0.04 }))
-    this.put('black:idle', this.make({ color: 0x1a120e, roughness: 0.34, metalness: 0.08 }))
-    this.put(
-      'white:selected',
-      this.make({
-        color: 0xf2e6d0,
-        emissive: 0xc9a227,
-        emissiveIntensity: 0.55,
-        roughness: 0.62,
-        metalness: 0.04,
-      }),
-    )
-    this.put(
-      'black:selected',
-      this.make({
-        color: 0x1a120e,
-        emissive: 0xc9a227,
-        emissiveIntensity: 0.7,
-        roughness: 0.34,
-        metalness: 0.08,
-      }),
-    )
-    this.put(
-      'white:dragging',
-      this.make({ color: 0xf2e6d0, roughness: 0.62, metalness: 0.04, opacity: 0.65 }),
-    )
-    this.put(
-      'black:dragging',
-      this.make({ color: 0x1a120e, roughness: 0.34, metalness: 0.08, opacity: 0.65 }),
-    )
-    this.put('board:light', this.make({ color: 0xd9c7a2, roughness: 0.92, metalness: 0 }))
-    this.put('board:dark', this.make({ color: 0x5c3b24, roughness: 0.58, metalness: 0.03 }))
-    this.put('board:frame', this.make({ color: 0x3a2415, roughness: 0.55, metalness: 0.04 }))
+    const size = marbleBakeSize()
+    const lightAtlas = this.keep(bakeMarble({ size, dark: false, veinMix: 1, cells: 8 }))
+    const darkAtlas = this.keep(bakeMarble({ size, dark: true, veinMix: 0.85, cells: 8 }))
+    const floorTile = this.keep(bakeMarble({
+      size: Math.max(64, size / 2),
+      dark: true,
+      veinMix: 0.35,
+      cells: 1,
+      base: [10, 10, 11],
+    }))
+    floorTile.repeat.set(4, 4)
+    const glyphs = this.keep(coordinateBorderTexture())
+
+    this.put('white:idle', this.metal(0xe4d6c8, 0.22, 0, 0, 1, 1.15, true))
+    this.put('black:idle', this.metal(0xc06a38, 0.12, 0, 0, 1, 1.65, true))
+    this.put('white:selected', this.metal(0xe4d6c8, 0.22, 0xc9a44c, 0.18, 1, 1.15, true))
+    this.put('black:selected', this.metal(0xc06a38, 0.12, 0xc9a44c, 0.16, 1, 1.65, true))
+    this.put('white:dragging', this.metal(0xe4d6c8, 0.22, 0, 0, 0.7, 1.15, true))
+    this.put('black:dragging', this.metal(0xc06a38, 0.12, 0, 0, 0.7, 1.65, true))
+    for (const finish of ['idle', 'selected', 'dragging'] as const) {
+      const black = this.get('black', finish)
+      if (black instanceof MeshStandardMaterial) black.metalness = 0.92
+    }
+
+    this.put('board:light', this.marble(lightAtlas, 0.16, 0, 0.08, 0.4, false, true))
+    this.put('board:dark', this.marble(darkAtlas, 0.12, 0, 0.06, 0.15, false, true))
+    this.put('board:frame', this.marble(floorTile, 0.08, 0.85, 0.08, 0.28, true))
     this.put(
       'board:highlight',
       this.make({
-        color: 0xc9a227,
-        emissive: 0xc9a227,
-        emissiveIntensity: 0.45,
-        roughness: 0.45,
-        metalness: 0.06,
+        color: 0x5a3510,
+        emissive: 0x8a5a14,
+        emissiveIntensity: 0.35,
+        roughness: 0.28,
+        metalness: 0.35,
+        clearcoat: 0.4,
+        envMapIntensity: 1.1,
+        polygonOffset: true,
       }),
     )
-    this.put('room:floor', this.make({ color: 0x6a503c, roughness: 0.78, metalness: 0.02 }))
-    this.put('room:plaster', this.make({ color: 0xe4ddd2, roughness: 0.9, metalness: 0 }))
-    this.put('room:rug', this.make({ color: 0x6e2f3a, roughness: 0.96, metalness: 0 }))
-    this.put('room:seat', this.make({ color: 0x3e342c, roughness: 0.84, metalness: 0.02 }))
-    this.put('room:window', this.make({ color: 0x9eb4c2, roughness: 0.22, metalness: 0.04 }))
-    this.put('room:trim', this.make({ color: 0x4a3424, roughness: 0.6, metalness: 0.03 }))
+    this.put('board:gold', this.metal(0xc9a44c, 0.18, 0, 0, 1, 1))
+    this.put(
+      'board:coords',
+      this.make({
+        color: 0xffffff,
+        map: glyphs,
+        roughness: 0.4,
+        metalness: 0,
+        clearcoat: 0,
+        envMapIntensity: 0.2,
+        transparent: true,
+        alphaTest: 0.35,
+      }),
+    )
+    this.put(
+      'piece:felt',
+      this.make({
+        color: 0x070807,
+        roughness: 0.95,
+        metalness: 0,
+        clearcoat: 0,
+        envMapIntensity: 0.3,
+        sheen: 0,
+      }),
+    )
+
+    this.put('room:floor', this.marble(floorTile, 0.42, 0, 0.18, 0.2, true))
+    this.put('room:table', this.marble(floorTile, 0.38, 0, 0.16, 0.2, true))
+    this.put('room:wall', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:plaster', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:ceiling', this.make({ color: 0xffffff, roughness: 1, metalness: 0, unlit: true }))
+    this.put('room:rug', this.make({ color: 0x161412, roughness: 0.9, metalness: 0, clearcoat: 0, envMapIntensity: 0.2 }))
+    this.put('room:seat', this.make({ color: 0x161412, roughness: 0.88, metalness: 0, clearcoat: 0, envMapIntensity: 0.35 }))
+    this.put('room:leg', this.make({ color: 0x141210, roughness: 0.35, metalness: 0.05, clearcoat: 0.2, clearcoatRoughness: 0.35, envMapIntensity: 0.8 }))
+    this.put(
+      'room:window',
+      this.make({
+        color: 0xffd4a0,
+        emissive: 0xffb56a,
+        emissiveIntensity: 0.45,
+        roughness: 0.15,
+        metalness: 0,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 0.8,
+      }),
+    )
+    this.put('room:trim', this.metal(0xc9a44c, 0.22, 0, 0, 1, 1))
   }
 
   /** The shared material for `color` and `finish`. */
-  get(color: PieceColor, finish: PieceFinish): MeshStandardMaterial {
-    return this.table.get(`${color}:${finish}`) as MeshStandardMaterial
+  get(color: PieceColor, finish: PieceFinish): HallMaterial {
+    return this.table.get(`${color}:${finish}`) as HallMaterial
   }
 
   /**
-   * Light felted maple or dark walnut.
+   * Cream or black marble.
    * The same instance is reused for every square of that tone.
    */
-  boardSquare(tone: BoardTone): MeshStandardMaterial {
+  boardSquare(tone: BoardTone): HallMaterial {
     return this.table.get(`board:${tone}`) as MeshStandardMaterial
   }
 
-  /** Walnut lip around the 8x8. Also used for the table top. */
-  boardFrame(): MeshStandardMaterial {
+  /** Black marble lip around the 8x8. Also used for the table top. */
+  boardFrame(): HallMaterial {
     return this.table.get('board:frame') as MeshStandardMaterial
   }
 
@@ -119,45 +186,160 @@ export class PieceMaterialSet {
     return this.table.get('board:highlight') as MeshStandardMaterial
   }
 
-  /** Plank floor. */
-  floorWood(): MeshStandardMaterial {
+  /** Champagne file and rank glyphs. */
+  coords(): HallMaterial {
+    return this.table.get('board:coords') as MeshStandardMaterial
+  }
+
+  /** Dark felt under a piece base. */
+  felt(): HallMaterial {
+    return this.table.get('piece:felt') as MeshStandardMaterial
+  }
+
+  /** Black marble table top. Separate from the board so the table stays dimmer. */
+  tableTop(): HallMaterial {
+    return this.table.get('room:table') as MeshStandardMaterial
+  }
+
+  /** Black marble floor. */
+  floorWood(): HallMaterial {
     return this.table.get('room:floor') as MeshStandardMaterial
   }
 
-  /** Walls and ceiling. Flat color, no paint texture. */
-  plaster(): MeshStandardMaterial {
+  /** Black marble walls. Large veins, almost no clearcoat. */
+  wall(): HallMaterial {
+    return this.table.get('room:wall') as MeshStandardMaterial
+  }
+
+  /** Dark stone walls. */
+  plaster(): HallMaterial {
     return this.table.get('room:plaster') as MeshStandardMaterial
   }
 
-  /** Rug under the table. High roughness reads as cloth without a normal map. */
-  rugFelt(): MeshStandardMaterial {
+  /** Near-black ceiling. */
+  ceiling(): HallMaterial {
+    return this.table.get('room:ceiling') as MeshStandardMaterial
+  }
+
+  /** Hidden rug material. The mesh itself is not shown. */
+  rugFelt(): HallMaterial {
     return this.table.get('room:rug') as MeshStandardMaterial
   }
 
   /** Both chairs. */
-  seatCloth(): MeshStandardMaterial {
+  seatCloth(): HallMaterial {
     return this.table.get('room:seat') as MeshStandardMaterial
   }
 
-  /** Opaque pane. A transparent shader would be an extra pass on Quest. */
-  windowPane(): MeshStandardMaterial {
+  /** Table legs. */
+  leg(): HallMaterial {
+    return this.table.get('room:leg') as MeshStandardMaterial
+  }
+
+  /** Warm practical pane. */
+  windowPane(): HallMaterial {
     return this.table.get('room:window') as MeshStandardMaterial
   }
 
-  /** Baseboards, table legs, and the window trim. */
+  /** Soft disc under a piece. It does not cast a shadow of its own. */
+  contact(): MeshBasicMaterial {
+    if (!this.contactMaterial) {
+      this.contactMaterial = new MeshBasicMaterial({
+        color: 0x000000,
+        map: this.keep(contactFalloffTexture()),
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      })
+    }
+    return this.contactMaterial
+  }
+
+  /** Brass inlay and the gold lines between squares. */
+  gold(): MeshStandardMaterial {
+    return this.table.get('board:gold') as MeshStandardMaterial
+  }
+
+  /** Gold trim, window frame, and column rings. */
   trimWood(): MeshStandardMaterial {
     return this.table.get('room:trim') as MeshStandardMaterial
   }
 
   /**
+   * A live mirror can show through the squares. Without one they stay opaque
+   * so light and dark marble still separate in the default view.
+   */
+  setMirrorBlend(enabled: boolean): void {
+    const light = this.boardSquare('light')
+    const dark = this.boardSquare('dark')
+    light.opacity = enabled ? 0.82 : 1
+    dark.opacity = enabled ? 0.7 : 1
+    light.transparent = enabled
+    dark.transparent = enabled
+    light.depthWrite = !enabled
+    dark.depthWrite = !enabled
+  }
+
+  /**
+   * Give the polished metals a shared reflection map.
+   * Marble and the room stay unlit by the PMREM so the hall does not sample it per pixel.
+   */
+  bindReflections(texture: Texture): void {
+    if (this.reflection && this.reflection !== texture) this.reflection.dispose()
+    this.reflection = texture
+    for (const key of [...PIECE_KEYS, 'board:light', 'board:dark']) {
+      const material = this.table.get(key) as MeshStandardMaterial
+      material.envMap = texture
+      material.needsUpdate = true
+    }
+  }
+
+  /** Swap the placeholder marble maps for the GPU bake. Old targets are released first. */
+  installBakedMarble(baked: BakedMarbleMaps): void {
+    const stale: Texture[] = []
+    const assign = (key: string, texture: Texture) => {
+      const material = this.table.get(key) as MeshStandardMaterial
+      if (material.map && material.map !== texture) stale.push(material.map)
+      material.map = texture
+      material.needsUpdate = true
+    }
+    assign('board:light', baked.light)
+    assign('board:dark', baked.dark)
+    assign('board:frame', baked.frame)
+    assign('room:floor', baked.floor)
+    assign('room:table', baked.floor)
+    assign('room:wall', baked.wall)
+    assign('room:plaster', baked.wall)
+    for (const target of this.bakeTargets) target.dispose()
+    this.bakeTargets = baked.targets
+    for (const texture of stale) {
+      const index = this.textures.indexOf(texture)
+      if (index < 0) continue
+      texture.dispose()
+      this.textures.splice(index, 1)
+    }
+  }
+
+  /**
+   * Squares stay opaque until a mirror asks for a blend.
+   * Metals use a constant roughness so the fragment shader skips scratch maps.
+   */
+  setTier(tier: 'desktop' | 'quest'): void {
+    if (tier === 'quest') this.setMirrorBlend(false)
+  }
+
+  /**
    * Counts shared materials and sampled textures.
-   * A non-zero texture count means this set is no longer honest about 72fps.
+   * Desktop and Quest share this set; {@link setTier} keeps the squares opaque.
    */
   gpuBudget(): MaterialGpuBudget {
     let textureCount = 0
     for (const material of this.table.values()) {
       for (const slot of TEXTURE_SLOTS) {
-        const value = material[slot] as Texture | null
+        const value = (material as unknown as Record<string, Texture | null | undefined>)[slot]
         if (value) textureCount += 1
       }
     }
@@ -170,33 +352,151 @@ export class PieceMaterialSet {
     for (const mesh of host.meshes()) mesh.material = material
   }
 
-  /** Dispose the shared materials. Call once, when the hall is torn down. */
+  /** Dispose the shared materials and the marble maps. Call once, when the hall is torn down. */
   dispose(): void {
     for (const material of this.table.values()) material.dispose()
+    for (const target of this.bakeTargets) target.dispose()
+    this.bakeTargets = []
+    this.reflection?.dispose()
+    this.reflection = null
+    this.contactMaterial?.dispose()
+    for (const texture of this.textures) texture.dispose()
     this.table.clear()
+    this.textures.length = 0
   }
 
-  private put(key: string, material: MeshStandardMaterial): void {
+  private keep(texture: Texture): Texture {
+    this.textures.push(texture)
+    return texture
+  }
+
+  private metal(
+    color: number,
+    roughness: number,
+    emissive = 0,
+    emissiveIntensity = 0,
+    opacity = 1,
+    envMapIntensity = 1,
+    shaded = false,
+  ): HallMaterial {
+    if (!shaded) {
+      return new MeshBasicMaterial({
+        color,
+        transparent: opacity < 1,
+        opacity,
+      })
+    }
+    return new MeshStandardMaterial({
+      color,
+      roughness,
+      metalness: 1,
+      emissive,
+      emissiveIntensity,
+      transparent: opacity < 1,
+      opacity,
+      envMapIntensity,
+    })
+  }
+
+  private marble(
+    map: Texture,
+    roughness: number,
+    clearcoat: number,
+    clearcoatRoughness: number,
+    envMapIntensity: number,
+    unlit = false,
+    physical = false,
+  ): HallMaterial {
+    return this.make({
+      color: 0xffffff,
+      map,
+      roughness,
+      metalness: 0,
+      clearcoat,
+      clearcoatRoughness,
+      envMapIntensity,
+      ior: 1.5,
+      unlit,
+      physical,
+    })
+  }
+
+  private put(key: string, material: HallMaterial): void {
     this.table.set(key, material)
   }
 
   private make(args: {
     color: number
+    map?: Texture
     emissive?: number
     emissiveIntensity?: number
     opacity?: number
     roughness: number
+    roughnessMap?: Texture
+    normalMap?: Texture
     metalness: number
-  }): MeshStandardMaterial {
+    clearcoat?: number
+    clearcoatRoughness?: number
+    envMapIntensity?: number
+    ior?: number
+    reflectivity?: number
+    sheen?: number
+    sheenColor?: number
+    sheenRoughness?: number
+    transparent?: boolean
+    polygonOffset?: boolean
+    alphaTest?: number
+    unlit?: boolean
+    lit?: boolean
+    physical?: boolean
+  }): HallMaterial {
     const opacity = args.opacity ?? 1
-    return new MeshStandardMaterial({
+    const shared = {
       color: args.color,
+      map: args.map ?? null,
       emissive: args.emissive ?? 0x000000,
       emissiveIntensity: args.emissiveIntensity ?? 0,
-      roughness: args.roughness,
-      metalness: args.metalness,
-      transparent: opacity < 1,
+      transparent: args.transparent ?? opacity < 1,
       opacity,
-    })
+      depthWrite: opacity >= 1 && !args.transparent,
+      polygonOffset: args.polygonOffset ?? false,
+      polygonOffsetFactor: args.polygonOffset ? -2 : 0,
+      polygonOffsetUnits: args.polygonOffset ? -2 : 0,
+    }
+    if (args.unlit) {
+      const basic = new MeshBasicMaterial({
+        color: args.color,
+        map: args.map ?? null,
+        transparent: shared.transparent,
+        opacity,
+        depthWrite: shared.depthWrite,
+        polygonOffset: shared.polygonOffset,
+        polygonOffsetFactor: shared.polygonOffsetFactor,
+        polygonOffsetUnits: shared.polygonOffsetUnits,
+      })
+      if (args.alphaTest !== undefined) basic.alphaTest = args.alphaTest
+      return basic
+    }
+    const coated = (args.clearcoat ?? 0) > 0 || args.physical === true
+    const material = coated
+      ? new MeshPhysicalMaterial({
+        ...shared,
+        roughness: args.roughness,
+        metalness: args.metalness,
+        clearcoat: args.clearcoat ?? 0,
+        clearcoatRoughness: args.clearcoatRoughness ?? 0.1,
+        envMapIntensity: args.envMapIntensity ?? 1,
+        ior: args.ior ?? 1.5,
+      })
+      : args.metalness >= 0.2 || args.lit
+        ? new MeshStandardMaterial({
+          ...shared,
+          roughness: args.roughness,
+          metalness: args.metalness,
+          envMapIntensity: args.envMapIntensity ?? 1,
+        })
+        : new MeshLambertMaterial(shared)
+    if (args.alphaTest !== undefined) material.alphaTest = args.alphaTest
+    return material
   }
 }

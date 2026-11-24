@@ -83,11 +83,14 @@ describe('PhysicalChessClock', () => {
   it('reuses one texture when the label changes and skips a repeat', () => {
     const context = {
       fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
       font: '',
       textAlign: '',
       textBaseline: '',
       fillRect: () => undefined,
       fillText: () => undefined,
+      strokeRect: () => undefined,
     }
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D)
     const clock = new PhysicalChessClock()
@@ -110,6 +113,9 @@ describe('PhysicalChessClock', () => {
     clock.apply(snap('10:00', 'running'))
     clock.apply(snap('10:00', 'running'))
     clock.apply(snap('9:59', 'confirmed-flag'))
+    expect(context.fillStyle).toBe('#f3efe6')
+    expect(context.font).toContain('Georgia')
+    expect(clock.object.getObjectByName('clock-rim')).toBeTruthy()
     expect(clock.object.children.length).toBeGreaterThan(0)
     clock.dispose()
   })

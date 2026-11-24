@@ -16,9 +16,11 @@ describe('BoardModel', () => {
 
     const light = board.squareMesh({ file: 0, rank: 0 }) as Mesh
     const dark = board.squareMesh({ file: 1, rank: 0 }) as Mesh
-    const lightHex = (light.material as MeshStandardMaterial).color.getHex()
-    const darkHex = (dark.material as MeshStandardMaterial).color.getHex()
-    expect(lightHex).toBeGreaterThan(darkHex)
+    const lightMap = (light.material as MeshStandardMaterial).map?.image as { data: Uint8Array }
+    const darkMap = (dark.material as MeshStandardMaterial).map?.image as { data: Uint8Array }
+    expect(lightMap.data[0] + lightMap.data[1] + lightMap.data[2]).toBeGreaterThan(
+      darkMap.data[0] + darkMap.data[1] + darkMap.data[2],
+    )
     expect(light.material).toBe(board.squareMesh({ file: 1, rank: 1 })?.material)
     expect(dark.material).toBe(board.squareMesh({ file: 0, rank: 1 })?.material)
     expect(light.material).not.toBe(dark.material)

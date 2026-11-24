@@ -103,6 +103,40 @@ describe('HallRuntime', () => {
     expect(slow.warned).toBe(true)
     expect(logger.warn).toHaveBeenCalled()
 
+    const sync = vi.spyOn(runtime.hall, 'syncDecals')
+    runtime.pointer.attach()
+    picker.pick.mockReturnValue({
+      square: { file: 4, rank: 4 },
+      piece,
+      clock: false,
+      world: { x: 0, y: 1, z: 0 },
+    })
+    runtime.pointer.handle({ type: 'down', x: 0, y: 0, pointerId: 2 })
+    runtime.frame(2000)
+    expect(sync).toHaveBeenCalled()
+    runtime.pointer.handle({ type: 'cancel', x: 0, y: 0, pointerId: 2 })
+    const afterStop = sync.mock.calls.length
+    runtime.frame(2016)
+    expect(sync.mock.calls.length).toBeGreaterThan(afterStop)
+    const settled = sync.mock.calls.length
+    runtime.frame(2032)
+    expect(sync.mock.calls.length).toBe(settled)
+
+    const jumped = new HallRuntime({
+      session: new GameSession({ pieces: [whitePawn({ id: 'jump-pawn' })], legalDestinations: {} }),
+      picker,
+      now: () => 0,
+    })
+    const jumping = jumped.hall.getPiece('jump-pawn')
+    expect(jumping).toBeTruthy()
+    jumped.animator.animate(jumping as NonNullable<typeof jumping>, { file: 4, rank: 4 }, 200)
+    const jumpedSync = vi.spyOn(jumped.hall, 'syncDecals')
+    jumped.frame(5_000)
+    expect(jumped.animator.isAnimating()).toBe(false)
+    expect(jumpedSync).toHaveBeenCalled()
+    expect(jumping?.getSquare()).toEqual({ file: 4, rank: 4 })
+    jumped.dispose()
+
     runtime.dispose()
     expect(runtime.hall.root.children).toHaveLength(0)
     runtime.pointer.handle({ type: 'down', x: 0, y: 0, pointerId: 1 })

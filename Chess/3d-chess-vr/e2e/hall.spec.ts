@@ -1,9 +1,16 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+import { expectPiecesShaded, expectProbePainted, waitForHallCanvas } from './hallCanvas'
+
+async function waitForNextFrame(page: Page): Promise<void> {
+  const before = await page.locator('canvas').getAttribute('data-frames')
+  await expect.poll(async () => page.locator('canvas').getAttribute('data-frames'), { timeout: 60_000 }).not.toBe(before)
+}
 
 test('pass and play moves the clock and the immersive switch keeps the session', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?probe=1')
   await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
-  await page.waitForTimeout(600)
+  await waitForHallCanvas(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/hall-seated.png', fullPage: false })
 
   await page.evaluate(() => {
@@ -14,7 +21,7 @@ test('pass and play moves the clock and the immersive switch keeps the session',
     app.tourSkip()
     app.selectPiece('white-pawn-5')
   })
-  await page.waitForTimeout(400)
+  await waitForNextFrame(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/legal-moves.png', fullPage: false })
 
   const before = await page.getByTestId('session-id').innerText()
@@ -34,8 +41,43 @@ test('pass and play moves the clock and the immersive switch keeps the session',
   await expect(page.getByTestId('clock-active')).toHaveText('black')
 
   await page.getByRole('button', { name: '3D / Immersive' }).click()
-  await page.waitForTimeout(500)
+  await waitForNextFrame(page)
   await page.screenshot({ path: '/opt/cursor/artifacts/immersive-toggle.png', fullPage: false })
   await expect(page.getByTestId('session-id')).toHaveText(before)
   await expect(page.getByTestId('clock-active')).toHaveText('black')
+  await expectProbePainted(page)
+  await expectPiecesShaded(page)
+})
+
+test('dismiss is clickable and a cancelled Lichess sign-in stays on screen', async ({ page }) => {
+  await page.goto('/?error=access_denied&state=cancelled')
+  const dismissed = page.getByRole('button', { name: 'Dismiss' })
+  await expect(dismissed).toBeVisible()
+  await dismissed.click()
+  await expect(dismissed).toHaveCount(0)
+  await expect(page.locator('.hall-lichess').getByText('Lichess sign-in was cancelled. You can try again anytime.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in with Lichess' })).toBeEnabled()
+})
+
+test('menu buttons sit above the clock column and Close shuts the menu', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForFunction(() => Boolean((window as unknown as { __CHESS_APP__?: object }).__CHESS_APP__))
+  await page.getByRole('button', { name: 'Menu' }).click()
+  const menu = page.getByRole('dialog', { name: 'Menu' })
+  await expect(menu).toBeVisible()
+  for (const name of ['Close', 'Resign', 'Offer draw']) {
+    const button = menu.getByRole('button', { name })
+    const box = await button.boundingBox()
+    if (!box) throw new Error(`${name} has no box`)
+    const onTop = await page.evaluate(
+      ({ x, y, label }) => {
+        const hit = document.elementFromPoint(x, y)
+        return Boolean(hit?.closest('button')?.textContent?.trim() === label)
+      },
+      { x: box.x + box.width / 2, y: box.y + box.height / 2, label: name },
+    )
+    expect(onTop, `${name} is the top hit`).toBe(true)
+  }
+  await menu.getByRole('button', { name: 'Close' }).click()
+  await expect(menu).toHaveCount(0)
 })

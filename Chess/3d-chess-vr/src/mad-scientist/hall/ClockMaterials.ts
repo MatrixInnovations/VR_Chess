@@ -10,35 +10,41 @@ import type { ClockFaceExpiry } from './ClockViewMirror'
  * No texture maps: the hall's Quest budget still counts sampled textures.
  */
 export class ClockMaterials {
-  readonly body = new MeshStandardMaterial({ color: 0x2a3038, roughness: 0.45, metalness: 0.25 })
+  readonly body = new MeshStandardMaterial({
+    color: 0xd5d8df,
+    emissive: 0x6a707a,
+    emissiveIntensity: 0.35,
+    roughness: 0.22,
+    metalness: 0.45,
+  })
 
-  readonly running = new MeshStandardMaterial({ color: 0xe7e1d6, roughness: 0.55, metalness: 0.02 })
+  readonly running = new MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.45, metalness: 0.05 })
 
   readonly provisional = new MeshStandardMaterial({
-    color: 0xe0b15a,
+    color: 0xc9a44c,
     emissive: 0xc9a227,
-    emissiveIntensity: 0.35,
-    roughness: 0.5,
-    metalness: 0.04,
+    emissiveIntensity: 0.3,
+    roughness: 0.4,
+    metalness: 0.4,
   })
 
   readonly confirmed = new MeshStandardMaterial({
     color: 0x8e2d2d,
     emissive: 0x6e1212,
-    emissiveIntensity: 0.45,
+    emissiveIntensity: 0.35,
     roughness: 0.48,
-    metalness: 0.05,
+    metalness: 0.08,
   })
 
   readonly offlineFlag = new MeshStandardMaterial({
-    color: 0x5c3d8a,
-    emissive: 0x3a2460,
-    emissiveIntensity: 0.4,
-    roughness: 0.5,
-    metalness: 0.04,
+    color: 0x8a4a2a,
+    emissive: 0xc06a38,
+    emissiveIntensity: 0.25,
+    roughness: 0.45,
+    metalness: 0.5,
   })
 
-  readonly noClock = new MeshStandardMaterial({ color: 0x8d939c, roughness: 0.7, metalness: 0.02 })
+  readonly noClock = new MeshStandardMaterial({ color: 0x6a6560, roughness: 0.7, metalness: 0.05 })
 
   /**
    * Material for a classified face.

@@ -26,10 +26,6 @@ Ultron's `LichessClient` posts seek, move, resign, and abort. It does not post d
 
 If the local move list is already ahead of a `gameState` whose `moves` string is a prefix of that list, ignore that event's `wtime` / `btime`. Applying them puts the clock back on the side that just moved. The next event that includes the move is the one to trust. Times are milliseconds.
 
-### Stock piece files
-
-`Chess/3d-chess-vr/public/*.gltf` is still the original set. Mad Scientist does not load it. The meshes are too heavy to draw on a Quest as shipped (index counts roughly: pawn 168k, rook 54k, knight 136k, bishop 213k, queen 197k, king 273k). Each node is scaled by about 0.0254. A loader has to fit the piece to a few centimetres and decimate before instancing, or the frame budget in PR #2 will not hold.
-
 ### WebXR session knobs
 
 Vision models desktop versus immersive. It does not open the session. The removed adapter used `@react-three/xr` `createXRStore` with:
